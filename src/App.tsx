@@ -12,6 +12,7 @@ import CTRReview from "./pages/compliance/CTRReview";
 import AnalysisQueue from "./pages/analysis/AnalysisQueue";
 import SubmitReport from "./pages/reporting-entity/SubmitReport";
 import MySubmissions from "./pages/reporting-entity/MySubmissions";
+import SubmissionDetail from "./pages/reporting-entity/SubmissionDetail";
 import Resubmissions from "./pages/reporting-entity/Resubmissions";
 import Statistics from "./pages/reporting-entity/Statistics";
 
@@ -30,6 +31,7 @@ const App = () => (
               {/* Reporting Entity Workspace Routes (f2.md Section 2.1) */}
               <Route path="/submit" element={<SubmitReport />} />
               <Route path="/submissions" element={<MySubmissions />} />
+              <Route path="/submissions/:id" element={<SubmissionDetail />} />
               <Route path="/resubmissions" element={<Resubmissions />} />
               <Route path="/statistics" element={<Statistics />} />
               {/* Compliance Workspace Routes (f2.md Section 2.2) */}
