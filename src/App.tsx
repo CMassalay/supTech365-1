@@ -1,3 +1,4 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,8 +6,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import Login from "./pages/auth/Login";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
+import ChangePasswordRequired from "./pages/auth/ChangePasswordRequired";
+import RegisterEntity from "./pages/admin/RegisterEntity";
+import CreateUser from "./pages/admin/CreateUser";
 import ValidationQueue from "./pages/compliance/ValidationQueue";
 import ValidationDetail from "./pages/compliance/ValidationDetail";
 import AllValidations from "./pages/compliance/AllValidations";
@@ -50,6 +58,40 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password/:token" element={<ResetPassword />} />
+              
+              {/* Protected Password Change Route */}
+              <Route
+                path="/change-password-required"
+                element={
+                  <ProtectedRoute>
+                    <ChangePasswordRequired />
+                  </ProtectedRoute>
+                }
+              />
+              
+              {/* Protected Admin Routes */}
+              <Route
+                path="/admin/entities/register"
+                element={
+                  <ProtectedRoute requiredRole="tech_admin">
+                    <RegisterEntity />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users/create"
+                element={
+                  <ProtectedRoute requiredRole="tech_admin">
+                    <CreateUser />
+                  </ProtectedRoute>
+                }
+              />
+              
+              {/* Other Routes */}
               <Route path="/" element={<Index />} />
               {/* Reporting Entity Workspace Routes (f2.md Section 2.1) */}
               <Route path="/submit" element={<SubmitReport />} />
