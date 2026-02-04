@@ -1,11 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { User, UserRole } from "@/types/roles";
-import { authApi, ApiError } from "@/lib/api";
+import { User, UserRole, mapBackendRole } from "@/types/roles";
+import { authApi, ApiError, setStoredToken, getStoredToken, clearStoredToken } from "@/lib/api";
 
 interface Session {
-  expiresAt: string;
-  ipAddress: string;
-  userAgent: string;
+  sessionId: string;
+  expiresAt?: string;
 }
 
 interface AuthContextType {
@@ -13,7 +12,7 @@ interface AuthContextType {
   session: Session | null;
   setRole: (role: UserRole) => void;
   isAuthenticated: boolean;
-  login: (userData: any, sessionData: Session) => void;
+  login: (userData: any, accessToken: string, sessionId: string, rememberMe: boolean, passwordChangeRequired: boolean) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   requiresPasswordChange: boolean;
@@ -21,14 +20,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Convert API user data to User type
-const convertToUser = (userData: any): User => ({
-  id: userData.id,
-  name: userData.name || userData.username,
-  email: userData.email,
-  role: userData.role as UserRole,
-  avatar: userData.avatar,
-});
+function convertToUser(userData: {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  entity_id?: string | null;
+  entity_name?: string | null;
+}): User {
+  return {
+    id: userData.id,
+    name: userData.username,
+    email: userData.email,
+    role: mapBackendRole(userData.role),
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -37,20 +43,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
 
-  // Check authentication status on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
   const checkAuth = async () => {
+    const token = getStoredToken();
+    if (!token) {
+      setUser(null);
+      setSession(null);
+      setIsAuthenticated(false);
+      setRequiresPasswordChange(false);
+      setIsChecking(false);
+      return;
+    }
     try {
-      const response = await authApi.getMe();
-      const userData = convertToUser(response.user);
-      setUser(userData);
-      setSession(response.session);
+      const profile = await authApi.getProfile();
+      setUser(convertToUser(profile as any));
+      setSession({ sessionId: (profile as any).id ?? "" });
       setIsAuthenticated(true);
-      setRequiresPasswordChange(response.user.requiresPasswordChange || false);
+      setRequiresPasswordChange(false);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearStoredToken();
+      }
       setUser(null);
       setSession(null);
       setIsAuthenticated(false);
@@ -60,21 +72,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = (userData: any, sessionData: Session) => {
-    const user = convertToUser(userData);
-    setUser(user);
-    setSession(sessionData);
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const login = (
+    userData: any,
+    accessToken: string,
+    sessionId: string,
+    rememberMe: boolean,
+    passwordChangeRequired: boolean
+  ) => {
+    setStoredToken(accessToken, rememberMe);
+    setUser(convertToUser(userData));
+    setSession({ sessionId });
     setIsAuthenticated(true);
-    setRequiresPasswordChange(userData.requiresPasswordChange || false);
+    setRequiresPasswordChange(passwordChangeRequired);
   };
 
   const logout = async () => {
     try {
       await authApi.logout();
     } catch (err) {
-      // Continue with logout even if API call fails
       console.error("Logout error:", err);
     } finally {
+      clearStoredToken();
       setUser(null);
       setSession(null);
       setIsAuthenticated(false);
@@ -88,7 +110,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Show loading state while checking auth
   if (isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center">

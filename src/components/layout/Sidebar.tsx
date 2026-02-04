@@ -128,12 +128,15 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
         },
       ];
     case "tech_admin":
+    case "super_admin":
       return [
         {
           label: "Administration",
           items: [
             { title: "User Management", href: "/users", icon: Users },
             { title: "Entities", href: "/entities", icon: FileText },
+            { title: "Register Entity", href: "/admin/entities/register", icon: UserPlus },
+            { title: "Create User", href: "/admin/users/create", icon: UserPlus },
             { title: "Security", href: "/security", icon: Shield },
             { title: "System Config", href: "/config", icon: Settings },
           ],

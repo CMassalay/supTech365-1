@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { authApi, ApiError } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { validateEmail, validateUsername } from "@/lib/password-validation";
+import { mapBackendRole } from "@/types/roles";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
@@ -88,22 +89,26 @@ export default function Login() {
 
       const response = await authApi.login(data.username, data.password, data.rememberMe);
 
-      // Login successful - store user data
-      login(response.user, response.session);
+      // Store token and user; login() uses setStoredToken internally via login()
+      login(
+        response.user,
+        response.access_token,
+        response.session_id,
+        data.rememberMe,
+        response.password_change_required ?? false
+      );
 
-      // Check if password change is required
-      if (response.user.requiresPasswordChange) {
+      if (response.password_change_required) {
         navigate("/change-password-required");
         return;
       }
       toast.success(`Welcome back, ${response.user.username}!`);
 
-      // Redirect to return URL or role-based default
       const returnUrl = searchParams.get("returnUrl");
       if (returnUrl && returnUrl.startsWith("/")) {
         navigate(returnUrl);
       } else {
-        // Redirect based on role
+        const role = mapBackendRole(response.user.role);
         const roleRoutes: Record<string, string> = {
           reporting_entity: "/reporting-entity/submissions",
           compliance_officer: "/compliance/validation/assigned",
@@ -113,8 +118,9 @@ export default function Login() {
           director_ops: "/audit/dashboards/director-ops",
           oic: "/audit/dashboards/oic",
           tech_admin: "/admin/users",
+          super_admin: "/admin/users",
         };
-        navigate(roleRoutes[response.user.role] || "/");
+        navigate(roleRoutes[role] || "/");
       }
     } catch (err) {
       if (err instanceof ApiError) {

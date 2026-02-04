@@ -171,27 +171,20 @@ export default function RegisterEntity() {
 
     try {
       const response = await registrationApi.registerEntity({
-        entity: {
-          name: data.entityName,
-          type: data.entityType === "Other" ? data.entityTypeOther || "Other" : data.entityType,
-          registrationNumber: data.registrationNumber,
-          contactEmail: data.contactEmail,
-          contactPhone: data.contactPhone,
-        },
-        primaryContact: {
-          fullName: data.primaryContactName,
-          email: data.primaryContactEmail,
-          phone: data.primaryContactPhone,
-        },
-        initialUser: {
-          username: data.username,
-          email: data.userEmail,
-          password: data.password,
-          confirmPassword: data.confirmPassword,
-        },
+        entity_name: data.entityName,
+        entity_type: data.entityType === "Other" ? data.entityTypeOther || "Other" : data.entityType,
+        registration_number: data.registrationNumber,
+        contact_email: data.contactEmail,
+        contact_phone: data.contactPhone,
+        primary_contact_name: data.primaryContactName,
+        primary_contact_email: data.primaryContactEmail,
+        primary_contact_phone: data.primaryContactPhone,
+        username: data.username,
+        email: data.userEmail,
+        password: data.password,
       });
 
-      setRegistrationData(response.data);
+      setRegistrationData({ ...response, createdPassword: data.password });
       setShowSuccessDialog(true);
       toast.success(`Entity '${data.entityName}' and user account '${data.username}' created successfully!`);
     } catch (err) {
@@ -212,6 +205,9 @@ export default function RegisterEntity() {
           case "PASSWORD_MISMATCH":
             setError("Passwords do not match.");
             break;
+          case "VALIDATION_ERROR":
+            setError(err.message || "Please check the form and try again.");
+            break;
           default:
             setError(err.message || "An unexpected error occurred. Please try again.");
         }
@@ -225,7 +221,8 @@ export default function RegisterEntity() {
 
   const handleCopyCredentials = () => {
     if (!registrationData) return;
-    const text = `Username: ${registrationData.credentials.username}\nPassword: ${registrationData.credentials.password || "N/A"}`;
+    const pwd = registrationData.createdPassword ?? "";
+    const text = `Username: ${registrationData.user?.username ?? ""}\nPassword: ${pwd || "N/A"}`;
     navigator.clipboard.writeText(text);
     toast.success("Credentials copied to clipboard");
   };
@@ -582,22 +579,18 @@ export default function RegisterEntity() {
               <div className="space-y-2">
                 <p className="text-sm font-medium">Entity Details:</p>
                 <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-                  <p><strong>Entity ID:</strong> {registrationData.entity.id}</p>
-                  <p><strong>Entity Name:</strong> {registrationData.entity.name}</p>
+                  <p><strong>Entity ID:</strong> {registrationData.entity?.id}</p>
+                  <p><strong>Entity Name:</strong> {registrationData.entity?.name}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium">User Credentials:</p>
+                <p className="text-sm font-medium">User Account:</p>
                 <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-                  <p><strong>Username:</strong> {registrationData.credentials.username}</p>
-                  {registrationData.credentials.password && (
-                    <p><strong>Password:</strong> {registrationData.credentials.password}</p>
-                  )}
+                  <p><strong>Username:</strong> {registrationData.user?.username}</p>
+                  <p><strong>Email:</strong> {registrationData.user?.email}</p>
                 </div>
-                {registrationData.user.requiresPasswordChange && (
-                  <p className="text-sm text-yellow-600">User must change password on first login</p>
-                )}
+                <p className="text-sm text-muted-foreground">User must change password on first login.</p>
               </div>
 
               <DialogFooter className="flex-col sm:flex-row gap-2">

@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { ProtectedLayout } from "@/components/auth/ProtectedLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -58,41 +59,31 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Public Routes */}
+              {/* Public routes: unauthenticated users see these first */}
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
-              
-              {/* Protected Password Change Route */}
-              <Route
-                path="/change-password-required"
-                element={
-                  <ProtectedRoute>
-                    <ChangePasswordRequired />
-                  </ProtectedRoute>
-                }
-              />
-              
-              {/* Protected Admin Routes */}
-              <Route
-                path="/admin/entities/register"
-                element={
-                  <ProtectedRoute requiredRole="tech_admin">
-                    <RegisterEntity />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/users/create"
-                element={
-                  <ProtectedRoute requiredRole="tech_admin">
-                    <CreateUser />
-                  </ProtectedRoute>
-                }
-              />
-              
-              {/* Other Routes */}
-              <Route path="/" element={<Index />} />
+
+              {/* All other routes require auth; redirect to /login if not authenticated */}
+              <Route element={<ProtectedLayout />}>
+                <Route path="/change-password-required" element={<ChangePasswordRequired />} />
+                <Route
+                  path="/admin/entities/register"
+                  element={
+                    <ProtectedRoute requiredRole={["tech_admin", "super_admin"]}>
+                      <RegisterEntity />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users/create"
+                  element={
+                    <ProtectedRoute requiredRole={["tech_admin", "super_admin"]}>
+                      <CreateUser />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/" element={<Index />} />
               {/* Reporting Entity Workspace Routes (f2.md Section 2.1) */}
               <Route path="/submit" element={<SubmitReport />} />
               <Route path="/submissions" element={<MySubmissions />} />
@@ -154,7 +145,8 @@ const App = () => (
               {/* Analysis Workspace Routes (f2.md Section 2.3) */}
               <Route path="/analysis-queue" element={<AnalysisQueue />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
             </Routes>
           </BrowserRouter>
         </TooltipProvider>

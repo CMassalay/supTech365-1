@@ -6,7 +6,25 @@ export type UserRole =
   | "head_of_analysis"
   | "director_ops"
   | "oic"
-  | "tech_admin";
+  | "tech_admin"
+  | "super_admin";
+
+/** Map backend role (e.g. SUPER_ADMIN) to app UserRole */
+export function mapBackendRole(backendRole: string): UserRole {
+  const normalized = backendRole?.toLowerCase().replace(/-/g, "_") || "";
+  const mapping: Record<string, UserRole> = {
+    super_admin: "super_admin",
+    tech_admin: "tech_admin",
+    reporting_entity: "reporting_entity",
+    compliance_officer: "compliance_officer",
+    head_of_compliance: "head_of_compliance",
+    analyst: "analyst",
+    head_of_analysis: "head_of_analysis",
+    director_ops: "director_ops",
+    oic: "oic",
+  };
+  return mapping[normalized] ?? "compliance_officer";
+}
 
 export interface User {
   id: string;
@@ -39,6 +57,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   director_ops: "Director of Operations",
   oic: "Officer in Charge",
   tech_admin: "Tech Administrator",
+  super_admin: "Super Administrator",
 };
 
 export const ROLE_WORKSPACES: Record<UserRole, string[]> = {
@@ -50,4 +69,5 @@ export const ROLE_WORKSPACES: Record<UserRole, string[]> = {
   director_ops: ["cases", "audit"],
   oic: ["cases", "audit", "admin"],
   tech_admin: ["admin"],
+  super_admin: ["admin"],
 };
