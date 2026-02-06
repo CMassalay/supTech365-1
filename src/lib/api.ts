@@ -155,7 +155,7 @@ export const authApi = {
     password: string,
     rememberMe: boolean = false
   ): Promise<LoginResponse> => {
-    const data = await apiRequest<LoginResponse>("/auth/login", {
+    const data = await apiRequest<LoginResponse>("/api/v1/auth/login", {
       method: "POST",
       body: JSON.stringify({
         username_or_email: usernameOrEmail,
