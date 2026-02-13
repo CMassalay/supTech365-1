@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { registrationApi, ApiError } from "@/lib/api";
+import { registrationApi, ApiError, getValidationErrors } from "@/lib/api";
 import { toast } from "sonner";
 
 const schema = z.object({
@@ -33,9 +33,6 @@ const schema = z.object({
   registration_number: z.string().min(1, "Required"),
   contact_email: z.string().min(1, "Required").email("Invalid email"),
   contact_phone: z.string().min(1, "Required"),
-  primary_contact_name: z.string().min(1, "Required"),
-  primary_contact_email: z.string().min(1, "Required").email("Invalid email"),
-  primary_contact_phone: z.string().min(1, "Required"),
   username: z.string().min(1, "Required"),
   email: z.string().min(1, "Required").email("Invalid email"),
   password: z.string().min(1, "Required"),
@@ -48,6 +45,7 @@ export default function RegisterEntity() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<{ field: string; message: string }[]>([]);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [registrationData, setRegistrationData] = useState<{
     entity?: { name: string; entity_type: string; registration_number: string; contact_email: string };
@@ -72,6 +70,7 @@ export default function RegisterEntity() {
 
   const onSubmit = async (data: FormData) => {
     setError(null);
+    setValidationErrors([]);
     setIsLoading(true);
     try {
       const response = await registrationApi.registerEntity({
@@ -80,9 +79,6 @@ export default function RegisterEntity() {
         registration_number: data.registration_number,
         contact_email: data.contact_email,
         contact_phone: data.contact_phone,
-        primary_contact_name: data.primary_contact_name,
-        primary_contact_email: data.primary_contact_email,
-        primary_contact_phone: data.primary_contact_phone,
         username: data.username,
         email: data.email,
         password: data.password,
@@ -106,8 +102,14 @@ export default function RegisterEntity() {
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message || "Registration failed");
+        const details = getValidationErrors(err);
+        setValidationErrors(details ?? []);
+        if (details?.length) {
+          toast.error("Please fix the validation errors below.");
+        }
       } else {
         setError("Connection error. Please try again.");
+        setValidationErrors([]);
       }
     } finally {
       setIsLoading(false);
@@ -128,17 +130,45 @@ export default function RegisterEntity() {
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription asChild>
+                <div className="space-y-2">
+                  <p className="font-medium">{error.split("\n")[0]}</p>
+                  {validationErrors.length > 0 ? (
+                    <ul className="list-disc list-inside text-sm space-y-1 mt-2">
+                      {validationErrors.map((e, i) => (
+                        <li key={i}>
+                          <span className="font-medium">
+                            {e.field.replace(/^body\s*->\s*/i, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}:
+                          </span>{" "}
+                          {e.message}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    error.includes("\n• ") && (
+                      <ul className="list-disc list-inside text-sm space-y-1 mt-2">
+                        {error
+                          .split("\n• ")
+                          .slice(1)
+                          .map((line, i) => (
+                            <li key={i}>{line}</li>
+                          ))}
+                      </ul>
+                    )
+                  )}
+                </div>
+              </AlertDescription>
             </Alert>
           )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="entity_name">entity_name</Label>
+                <Label htmlFor="entity_name">Entity name</Label>
                 <Input
                   id="entity_name"
                   {...register("entity_name")}
+                  placeholder="Legal or trading name"
                   aria-invalid={!!errors.entity_name}
                 />
                 {errors.entity_name && (
@@ -147,13 +177,13 @@ export default function RegisterEntity() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="entity_type">entity_type</Label>
+                <Label htmlFor="entity_type">Entity type</Label>
                 <Select
                   value={entity_type}
                   onValueChange={(v) => setValue("entity_type", v)}
                 >
                   <SelectTrigger id="entity_type">
-                    <SelectValue placeholder="Select" />
+                    <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Bank">Bank</SelectItem>
@@ -169,10 +199,11 @@ export default function RegisterEntity() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="registration_number">registration_number</Label>
+                <Label htmlFor="registration_number">Registration number</Label>
                 <Input
                   id="registration_number"
                   {...register("registration_number")}
+                  placeholder="Official registration number"
                   aria-invalid={!!errors.registration_number}
                 />
                 {errors.registration_number && (
@@ -181,11 +212,12 @@ export default function RegisterEntity() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contact_email">contact_email</Label>
+                <Label htmlFor="contact_email">Contact email</Label>
                 <Input
                   id="contact_email"
                   type="email"
                   {...register("contact_email")}
+                  placeholder="General contact address"
                   aria-invalid={!!errors.contact_email}
                 />
                 {errors.contact_email && (
@@ -194,10 +226,11 @@ export default function RegisterEntity() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contact_phone">contact_phone</Label>
+                <Label htmlFor="contact_phone">Contact phone</Label>
                 <Input
                   id="contact_phone"
                   {...register("contact_phone")}
+                  placeholder="Main contact number"
                   aria-invalid={!!errors.contact_phone}
                 />
                 {errors.contact_phone && (
@@ -206,47 +239,11 @@ export default function RegisterEntity() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="primary_contact_name">primary_contact_name</Label>
-                <Input
-                  id="primary_contact_name"
-                  {...register("primary_contact_name")}
-                  aria-invalid={!!errors.primary_contact_name}
-                />
-                {errors.primary_contact_name && (
-                  <p className="text-sm text-destructive">{errors.primary_contact_name.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="primary_contact_email">primary_contact_email</Label>
-                <Input
-                  id="primary_contact_email"
-                  type="email"
-                  {...register("primary_contact_email")}
-                  aria-invalid={!!errors.primary_contact_email}
-                />
-                {errors.primary_contact_email && (
-                  <p className="text-sm text-destructive">{errors.primary_contact_email.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="primary_contact_phone">primary_contact_phone</Label>
-                <Input
-                  id="primary_contact_phone"
-                  {...register("primary_contact_phone")}
-                  aria-invalid={!!errors.primary_contact_phone}
-                />
-                {errors.primary_contact_phone && (
-                  <p className="text-sm text-destructive">{errors.primary_contact_phone.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="username">username</Label>
+                <Label htmlFor="username">Username</Label>
                 <Input
                   id="username"
                   {...register("username")}
+                  placeholder="Login username"
                   aria-invalid={!!errors.username}
                 />
                 {errors.username && (
@@ -255,20 +252,22 @@ export default function RegisterEntity() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">email</Label>
+                <Label htmlFor="email">Login email</Label>
                 <Input
                   id="email"
                   type="email"
                   {...register("email")}
+                  placeholder="Email used to sign in"
                   aria-invalid={!!errors.email}
                 />
                 {errors.email && (
                   <p className="text-sm text-destructive">{errors.email.message}</p>
                 )}
+                <p className="text-xs text-muted-foreground">This email will be used to sign in to the platform.</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">password</Label>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -324,20 +323,20 @@ export default function RegisterEntity() {
             <div className="space-y-3 text-sm">
               {registrationData.entity && (
                 <div className="space-y-1">
-                  <p><span className="font-medium">entity_name:</span> {registrationData.entity.name}</p>
-                  <p><span className="font-medium">entity_type:</span> {registrationData.entity.entity_type}</p>
-                  <p><span className="font-medium">registration_number:</span> {registrationData.entity.registration_number}</p>
-                  <p><span className="font-medium">contact_email:</span> {registrationData.entity.contact_email}</p>
+                  <p><span className="font-medium">Entity name:</span> {registrationData.entity.name}</p>
+                  <p><span className="font-medium">Entity type:</span> {registrationData.entity.entity_type}</p>
+                  <p><span className="font-medium">Registration number:</span> {registrationData.entity.registration_number}</p>
+                  <p><span className="font-medium">Contact email:</span> {registrationData.entity.contact_email}</p>
                 </div>
               )}
               {registrationData.user && (
                 <div className="space-y-1">
-                  <p><span className="font-medium">username:</span> {registrationData.user.username}</p>
-                  <p><span className="font-medium">email:</span> {registrationData.user.email}</p>
+                  <p><span className="font-medium">Username:</span> {registrationData.user.username}</p>
+                  <p><span className="font-medium">Login email:</span> {registrationData.user.email}</p>
                 </div>
               )}
               {registrationData.message && (
-                <p><span className="font-medium">message:</span> {registrationData.message}</p>
+                <p className="text-muted-foreground">{registrationData.message}</p>
               )}
             </div>
           )}

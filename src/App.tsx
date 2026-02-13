@@ -16,6 +16,8 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import ChangePasswordRequired from "./pages/auth/ChangePasswordRequired";
 import RegisterEntity from "./pages/admin/RegisterEntity";
 import CreateUser from "./pages/admin/CreateUser";
+import CreateSuperAdmin from "./pages/admin/CreateSuperAdmin";
+import RolesPage from "./pages/admin/RolesPage";
 import ValidationQueue from "./pages/compliance/ValidationQueue";
 import ValidationDetail from "./pages/compliance/ValidationDetail";
 import AllValidations from "./pages/compliance/AllValidations";
@@ -93,6 +95,22 @@ const App = () => (
                   element={
                     <ProtectedRoute requiredRole={["tech_admin", "super_admin"]}>
                       <CreateUser />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/super-admin"
+                  element={
+                    <ProtectedRoute requiredRole={["tech_admin", "super_admin"]}>
+                      <CreateSuperAdmin />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/roles"
+                  element={
+                    <ProtectedRoute requiredRole={["tech_admin", "super_admin"]}>
+                      <RolesPage />
                     </ProtectedRoute>
                   }
                 />

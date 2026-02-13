@@ -81,7 +81,35 @@ function parse422Detail(detail: unknown): { message: string; fields?: Record<str
   };
 }
 
-/** Parse API error body into code and message. Handles { success: false, error: { code, message } }, detail, etc. */
+/** Humanize backend field path e.g. "body -> primary_contact_name" -> "Primary contact name" */
+function humanizeField(field: string): string {
+  const raw = field.replace(/^body\s*->\s*/i, "").trim().replace(/_/g, " ");
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+}
+
+/** Validation error item from API (e.g. error.details.errors[]) */
+export interface ValidationErrorItem {
+  field: string;
+  message: string;
+  type?: string;
+}
+
+/** Extract validation errors from ApiError when present (error.details.errors). */
+export function getValidationErrors(err: ApiError): ValidationErrorItem[] | null {
+  const data = err.data;
+  if (!data || typeof data !== "object") return null;
+  const error = (data as Record<string, unknown>).error;
+  if (!error || typeof error !== "object") return null;
+  const details = (error as Record<string, unknown>).details;
+  if (!details || typeof details !== "object") return null;
+  const errors = (details as Record<string, unknown>).errors;
+  if (!Array.isArray(errors)) return null;
+  return errors
+    .filter((e): e is ValidationErrorItem => e != null && typeof e === "object" && typeof (e as any).field === "string" && typeof (e as any).message === "string")
+    .map((e) => ({ field: (e as any).field, message: (e as any).message, type: (e as any).type }));
+}
+
+/** Parse API error body into code and message. Handles { success: false, error: { code, message, details } }, detail, etc. */
 function parseErrorBody(
   body: unknown,
   status: number,
@@ -89,11 +117,21 @@ function parseErrorBody(
 ): { code: string; message: string } {
   if (body && typeof body === "object") {
     const b = body as Record<string, unknown>;
-    // { success: false, error: { code, message, details } }
+    // { success: false, error: { code, message, details: { errors: [...] } } }
     if (b.error && typeof b.error === "object") {
       const err = b.error as Record<string, unknown>;
       const code = typeof err.code === "string" ? err.code : "ERROR";
-      const message = typeof err.message === "string" ? err.message : fallbackMessage;
+      let message = typeof err.message === "string" ? err.message : fallbackMessage;
+      const details = err.details;
+      if (details && typeof details === "object") {
+        const errors = (details as Record<string, unknown>).errors;
+        if (Array.isArray(errors) && errors.length > 0) {
+          const lines = errors
+            .filter((e): e is Record<string, unknown> => e != null && typeof e === "object" && typeof (e as any).message === "string")
+            .map((e) => `${humanizeField(String((e as any).field ?? ""))}: ${(e as any).message}`);
+          if (lines.length) message += "\n• " + lines.join("\n• ");
+        }
+      }
       return { code, message };
     }
     // Top-level code/message
@@ -338,9 +376,6 @@ export interface RegisterEntityPayload {
   registration_number: string;
   contact_email: string;
   contact_phone: string;
-  primary_contact_name: string;
-  primary_contact_email: string;
-  primary_contact_phone: string;
   username: string;
   email: string;
   password: string;
@@ -404,9 +439,6 @@ const REGISTER_ENTITY_KEYS: (keyof RegisterEntityPayload)[] = [
   "registration_number",
   "contact_email",
   "contact_phone",
-  "primary_contact_name",
-  "primary_contact_email",
-  "primary_contact_phone",
   "username",
   "email",
   "password",
@@ -469,6 +501,119 @@ export const registrationApi = {
     } catch {
       return { available: true, username };
     }
+  },
+};
+
+// --- Admin: Super Admin & Roles ---
+
+export interface CreateSuperAdminPayload {
+  username: string;
+  email: string;
+  password: string;
+}
+
+export interface CreateSuperAdminResponse {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  account_status: string;
+  entity_id: string;
+  entity_name: string | null;
+  last_login: string | null;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  permissions: string[];
+  user_count: number;
+}
+
+export interface GetRolesResponse {
+  items: Role[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
+export interface CreateRolePayload {
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
+export interface AssignRolePayload {
+  user_id: string;
+  role_name: string;
+}
+
+export interface AssignRoleResponse {
+  user_id: string;
+  username: string;
+  old_role: string;
+  new_role: string;
+  message: string;
+  success: boolean;
+}
+
+export const adminApi = {
+  createSuperAdmin: async (payload: CreateSuperAdminPayload): Promise<CreateSuperAdminResponse> => {
+    return apiRequest<CreateSuperAdminResponse>("/api/v1/admin/super-admin", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getRoles: async (params?: { page?: number; size?: number }): Promise<GetRolesResponse> => {
+    const search = new URLSearchParams();
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.size != null) search.set("size", String(params.size));
+    const qs = search.toString();
+    return apiRequest<GetRolesResponse>(`/api/v1/admin/roles${qs ? `?${qs}` : ""}`, { method: "GET" });
+  },
+
+  getRole: async (roleId: string): Promise<Role> => {
+    return apiRequest<Role>(`/api/v1/admin/roles/${encodeURIComponent(roleId)}`, { method: "GET" });
+  },
+
+  createRole: async (payload: CreateRolePayload): Promise<Role> => {
+    return apiRequest<Role>("/api/v1/admin/roles", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateRole: async (roleId: string, payload: Partial<CreateRolePayload>): Promise<Role> => {
+    return apiRequest<Role>(`/api/v1/admin/roles/${encodeURIComponent(roleId)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteRole: async (roleId: string, force?: boolean): Promise<string> => {
+    const qs = force === true ? "?force=true" : "";
+    return apiRequest<string>(`/api/v1/admin/roles/${encodeURIComponent(roleId)}${qs}`, {
+      method: "DELETE",
+    });
+  },
+
+  getAvailablePermissions: async (): Promise<string[]> => {
+    const result = await apiRequest<string[] | string>("/api/v1/admin/roles/available-permissions", {
+      method: "GET",
+    });
+    return Array.isArray(result) ? result : result ? [result] : [];
+  },
+
+  assignRoleToUser: async (payload: AssignRolePayload): Promise<AssignRoleResponse> => {
+    return apiRequest<AssignRoleResponse>("/api/v1/admin/roles/assign", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 };
 

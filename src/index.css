@@ -65,14 +65,14 @@
     --radius-lg: 0.75rem;
     --radius-xl: 1rem;
 
-    /* Sidebar — dark premium */
-    --sidebar-background: 222 47% 9%;
-    --sidebar-foreground: 210 40% 98%;
+    /* Sidebar — very light indigo */
+    --sidebar-background: 239 47% 97%;
+    --sidebar-foreground: 222 47% 18%;
     --sidebar-primary: 239 84% 67%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 47% 16%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 47% 14%;
+    --sidebar-accent: 239 40% 91%;
+    --sidebar-accent-foreground: 222 47% 18%;
+    --sidebar-border: 239 30% 90%;
     --sidebar-ring: 239 84% 67%;
 
     /* Chart */
@@ -103,13 +103,13 @@
     --border: 222 47% 18%;
     --input: 222 47% 18%;
     --ring: 239 84% 67%;
-    --sidebar-background: 222 47% 6%;
+    --sidebar-background: 222 47% 12%;
     --sidebar-foreground: 210 40% 96%;
     --sidebar-primary: 239 84% 67%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 47% 12%;
+    --sidebar-accent: 239 30% 20%;
     --sidebar-accent-foreground: 210 40% 96%;
-    --sidebar-border: 222 47% 14%;
+    --sidebar-border: 239 25% 22%;
     --sidebar-ring: 239 84% 67%;
   }
 }
