@@ -16,7 +16,7 @@ import { toast } from "sonner";
 
 const MAX_FILE_SIZE_MB = 10;
 
-type ReportTypeOption = "STR" | "CTR" | "Monthly" | "Quarterly";
+type ReportTypeOption = "STR" | "CTR";
 
 export default function SubmitReport() {
   const navigate = useNavigate();
@@ -145,18 +145,6 @@ export default function SubmitReport() {
                     CTR (Currency Transaction Report)
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="Monthly" id="monthly" />
-                  <Label htmlFor="monthly" className="font-normal cursor-pointer">
-                    Monthly (Monthly compliance report)
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="Quarterly" id="quarterly" />
-                  <Label htmlFor="quarterly" className="font-normal cursor-pointer">
-                    Quarterly (Quarterly compliance report)
-                  </Label>
-                </div>
               </RadioGroup>
             </div>
 
@@ -258,7 +246,7 @@ export default function SubmitReport() {
             {uploadStatus === "idle" && (
               <>
                 <DialogDescription>
-                  Report Type: {reportType === "STR" ? "STR (Suspicious Transaction Report)" : reportType === "CTR" ? "CTR (Currency Transaction Report)" : reportType === "Monthly" ? "Monthly compliance report" : "Quarterly compliance report"}
+                  Report Type: {reportType === "STR" ? "STR (Suspicious Transaction Report)" : "CTR (Currency Transaction Report)"}
                 </DialogDescription>
                 <div className="space-y-4">
                   <div className="space-y-2">

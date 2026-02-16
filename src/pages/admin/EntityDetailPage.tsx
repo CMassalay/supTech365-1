@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { registrationApi } from "@/lib/api";
 import type { Entity, UpdateEntityPayload } from "@/lib/api";
-import { FileText, Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { FileText, Pencil, Trash2, ArrowLeft, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 const updateSchema = z.object({
@@ -253,7 +253,22 @@ export default function EntityDetailPage() {
                     </dd>
                   </div>
                 </dl>
-                <p className="text-xs text-muted-foreground pt-2 border-t">ID: {entity.id}</p>
+                <div className="flex items-center gap-2 pt-2 border-t">
+                  <p className="text-xs text-muted-foreground">ID: {entity.id}</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigator.clipboard.writeText(entity.id);
+                      toast.success("Entity ID copied to clipboard");
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </>

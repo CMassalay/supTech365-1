@@ -464,11 +464,11 @@ export const registrationApi = {
     if (params?.limit != null) search.set("limit", String(params.limit));
     if (params?.offset != null) search.set("offset", String(params.offset));
     const qs = search.toString();
-    return apiRequest<GetEntitiesResponse>(`/api/v1/entity/${qs ? `?${qs}` : ""}`, { method: "GET" });
+    return apiRequest<GetEntitiesResponse>(`/api/v1/admin/entities${qs ? `?${qs}` : ""}`, { method: "GET" });
   },
 
   getEntity: async (id: string): Promise<Entity> => {
-    return apiRequest<Entity>(`/api/v1/entity/${encodeURIComponent(id)}`, { method: "GET" });
+    return apiRequest<Entity>(`/api/v1/admin/entities/${encodeURIComponent(id)}`, { method: "GET" });
   },
 
   getEntityByRegistrationNumber: async (regNumber: string): Promise<Entity> => {
@@ -479,7 +479,7 @@ export const registrationApi = {
   },
 
   updateEntity: async (id: string, payload: UpdateEntityPayload): Promise<Entity> => {
-    return apiRequest<Entity>(`/api/v1/entity/${encodeURIComponent(id)}`, {
+    return apiRequest<Entity>(`/api/v1/admin/entities/${encodeURIComponent(id)}`, {
       method: "PUT",
       body: JSON.stringify(payload),
     });
@@ -487,7 +487,7 @@ export const registrationApi = {
 
   deactivateEntity: async (id: string): Promise<DeactivateEntityResponse> => {
     return apiRequest<DeactivateEntityResponse>(
-      `/api/v1/entity/entities/${encodeURIComponent(id)}`,
+      `/api/v1/admin/entities/${encodeURIComponent(id)}`,
       { method: "DELETE" }
     );
   },
@@ -503,6 +503,112 @@ export const registrationApi = {
     }
   },
 };
+
+// --- Reporting Entity API: /api/v1/entities/ (for entity users to manage their entity) ---
+
+export interface EntityUser {
+  id: string;
+  username: string;
+  email: string;
+  role?: string;
+  entity_id?: string;
+  entity_name?: string;
+  account_status?: string;
+  last_login?: string | null;
+}
+
+/** Response from GET /api/v1/entities/{id}/users */
+export interface EntityUsersResponse {
+  entity_id: string;
+  entity_name: string | null;
+  users: EntityUser[];
+  total_users: number;
+}
+
+export interface EntityApiKey {
+  id: string;
+  entity_id: string;
+  entity_name?: string;
+  key_name: string;
+  key_prefix?: string;
+  is_active: boolean;
+  created_at: string;
+  last_used_at?: string | null;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  revocation_reason?: string | null;
+}
+
+/** API for reporting entity users: update own entity, list users, list API keys. (No GET entity - admin only.) */
+export const entityApi = {
+  /** PUT /api/v1/entities/{entity_id} - Update entity details. Returns 200 with entity. */
+  updateEntity: async (entityId: string, payload: UpdateEntityPayload): Promise<Entity> => {
+    return apiRequest<Entity>(`/api/v1/entities/${encodeURIComponent(entityId)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** GET /api/v1/entities/{entity_id}/users - Get all users for the entity. */
+  getEntityUsers: async (entityId: string): Promise<EntityUser[]> => {
+    const result = await apiRequest<EntityUsersResponse | EntityUser[] | unknown>(
+      `/api/v1/entities/${encodeURIComponent(entityId)}/users`,
+      { method: "GET" }
+    );
+    if (result && typeof result === "object" && "users" in result && Array.isArray((result as EntityUsersResponse).users)) {
+      return (result as EntityUsersResponse).users;
+    }
+    return Array.isArray(result) ? result : [];
+  },
+
+  /** GET /api/v1/entities/{entity_id}/api-keys - Get API keys for the entity. */
+  getEntityApiKeys: async (entityId: string, includeRevoked?: boolean): Promise<EntityApiKey[]> => {
+    const qs = includeRevoked === true ? "?include_revoked=true" : "";
+    const result = await apiRequest<EntityApiKey[] | unknown>(
+      `/api/v1/entities/${encodeURIComponent(entityId)}/api-keys${qs}`,
+      { method: "GET" }
+    );
+    return Array.isArray(result) ? result : [];
+  },
+};
+
+// --- Admin: Create Entity User ---
+
+export interface CreateEntityUserPayload {
+  entity_id: string;
+  username: string;
+  email: string;
+  password: string;
+  role_name?: string;
+  send_welcome_email?: boolean;
+}
+
+export interface CreateEntityUserResponse {
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    role: string;
+    account_status: string;
+    entity_id: string;
+    entity_name: string;
+    last_login: string | null;
+  };
+  entity: {
+    id: string;
+    name: string;
+    entity_type: string;
+    registration_number: string;
+    contact_email: string;
+    is_active: boolean;
+  };
+  welcome_email: {
+    email_sent: boolean;
+    recipient_email: string;
+    message: string;
+  };
+  message: string;
+}
 
 // --- Admin: Super Admin & Roles ---
 
@@ -562,6 +668,20 @@ export interface AssignRoleResponse {
 }
 
 export const adminApi = {
+  createEntityUser: async (payload: CreateEntityUserPayload): Promise<CreateEntityUserResponse> => {
+    return apiRequest<CreateEntityUserResponse>("/api/v1/admin/users/create", {
+      method: "POST",
+      body: JSON.stringify({
+        entity_id: payload.entity_id,
+        username: payload.username,
+        email: payload.email,
+        password: payload.password,
+        ...(payload.role_name != null && { role_name: payload.role_name }),
+        ...(payload.send_welcome_email != null && { send_welcome_email: payload.send_welcome_email }),
+      }),
+    });
+  },
+
   createSuperAdmin: async (payload: CreateSuperAdminPayload): Promise<CreateSuperAdminResponse> => {
     return apiRequest<CreateSuperAdminResponse>("/api/v1/admin/super-admin", {
       method: "POST",
