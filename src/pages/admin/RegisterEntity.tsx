@@ -83,6 +83,7 @@ export default function RegisterEntity() {
         email: data.email,
         password: data.password,
       });
+      console.log("Register entity response:", response);
       setRegistrationData({
         entity: response.entity
           ? {

@@ -16,6 +16,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   extendSession: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  clearPasswordChangeRequired: () => void;
   requiresPasswordChange: boolean;
 }
 
@@ -120,6 +121,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const clearPasswordChangeRequired = () => {
+    setRequiresPasswordChange(false);
+  };
+
   if (isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -142,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         extendSession,
         checkAuth,
+        clearPasswordChangeRequired,
         requiresPasswordChange,
       }}
     >

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Eye, EyeOff, Loader2, AlertCircle, Check, X, Copy, Mail, ExternalLink } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertCircle, Check, X, Copy } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { registrationApi, ApiError } from "@/lib/api";
+import { registrationApi, adminApi, ApiError, getValidationErrors } from "@/lib/api";
+import type { CreateEntityUserResponse } from "@/lib/api";
 import { validatePassword, validateEmail, validatePhone, validateUsername, type PasswordValidationResult } from "@/lib/password-validation";
 import { toast } from "sonner";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -39,18 +40,15 @@ const userCreationSchema = z
     email: z.string().min(1, "Email is required").email("Please enter a valid email address"),
     phone: z.string().optional(),
     role: z.string().min(1, "Please select a role"),
-    entityId: z.string().optional(),
-    password: z.string().min(1, "Password is required"),
+    entityId: z.string().min(1, "Please select an entity"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
     requirePasswordChange: z.boolean().default(true),
+    sendWelcomeEmail: z.boolean().default(true),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
-  })
-  .refine((data) => data.role !== "reporting_entity" || (data.entityId && data.entityId.length > 0), {
-    message: "Please select a reporting entity",
-    path: ["entityId"],
   });
 
 type UserCreationFormData = z.infer<typeof userCreationSchema>;
@@ -65,9 +63,10 @@ export default function CreateUser() {
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [passwordValidation, setPasswordValidation] = useState<PasswordValidationResult | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [registrationData, setRegistrationData] = useState<any>(null);
+  const [createResult, setCreateResult] = useState<CreateEntityUserResponse | null>(null);
   const [entities, setEntities] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoadingEntities, setIsLoadingEntities] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{ field: string; message: string }[]>([]);
 
   const {
     register,
@@ -80,6 +79,7 @@ export default function CreateUser() {
     defaultValues: {
       role: "compliance_officer",
       requirePasswordChange: true,
+      sendWelcomeEmail: true,
     },
   });
 
@@ -87,35 +87,32 @@ export default function CreateUser() {
   const password = watch("password");
   const role = watch("role");
   const entityId = watch("entityId");
+  const sendWelcomeEmail = watch("sendWelcomeEmail");
 
   // Debounce username availability check
   const debouncedUsername = useDebounce(username, 500);
 
-  // Load entities when role is Reporting Entity User
+  // Load entities on mount (required for entity user creation)
   useEffect(() => {
-    if (role === "reporting_entity") {
-      setIsLoadingEntities(true);
-      registrationApi
-        .getEntities({ limit: 500 })
-        .then((response) => {
-          setEntities(
-            (response.data || []).map((e) => ({
-              id: e.id,
-              name: e.name,
-            }))
-          );
-        })
-        .catch(() => {
-          toast.error("Failed to load entities");
-        })
-        .finally(() => {
-          setIsLoadingEntities(false);
-        });
-    } else {
-      setEntities([]);
-      setValue("entityId", undefined);
-    }
-  }, [role, setValue]);
+    setIsLoadingEntities(true);
+    registrationApi
+      .getEntities({ limit: 500 })
+      .then((response) => {
+        console.log("Entities (Create User dropdown):", response);
+        setEntities(
+          (response.data || []).map((e) => ({
+            id: e.id,
+            name: e.name,
+          }))
+        );
+      })
+      .catch(() => {
+        toast.error("Failed to load entities");
+      })
+      .finally(() => {
+        setIsLoadingEntities(false);
+      });
+  }, []);
 
   useEffect(() => {
     if (debouncedUsername && debouncedUsername.length >= 3) {
@@ -168,8 +165,8 @@ export default function CreateUser() {
       setError("This username is already taken. Please choose another.");
       return;
     }
-    if (role === "reporting_entity" && !data.entityId) {
-      setError("Please select a reporting entity");
+    if (!data.entityId) {
+      setError("Please select an entity");
       return;
     }
     if (!passwordValidation || !passwordValidation.isValid) {
@@ -182,26 +179,26 @@ export default function CreateUser() {
     }
 
     setError(null);
+    setValidationErrors([]);
     setIsLoading(true);
 
     try {
-      const response = await registrationApi.createUser({
-        fullName: data.fullName,
+      const roleName = ROLE_LABELS[data.role as keyof typeof ROLE_LABELS] ?? data.role;
+      const response = await adminApi.createEntityUser({
+        entity_id: data.entityId,
         username: data.username,
         email: data.email,
-        phone: data.phone,
-        role: data.role,
-        entityId: data.entityId,
         password: data.password,
-        confirmPassword: data.confirmPassword,
-        requirePasswordChange: data.requirePasswordChange,
+        role_name: roleName,
+        send_welcome_email: sendWelcomeEmail,
       });
 
-      setRegistrationData(response.data);
+      setCreateResult(response);
       setShowSuccessDialog(true);
-      toast.success(`User '${data.username}' created successfully!`);
+      toast.success(response.message || `User '${data.username}' created successfully!`);
     } catch (err) {
       if (err instanceof ApiError) {
+        setValidationErrors(getValidationErrors(err) ?? []);
         switch (err.code) {
           case "USERNAME_EXISTS":
             setError("This username is already taken. Please choose another.");
@@ -212,11 +209,9 @@ export default function CreateUser() {
           case "WEAK_PASSWORD":
             setError("Password does not meet requirements. Please check the requirements above.");
             break;
-          case "PASSWORD_MISMATCH":
-            setError("Passwords do not match.");
-            break;
           case "ENTITY_REQUIRED":
-            setError("Entity is required for Reporting Entity User role.");
+          case "ENTITY_NOT_FOUND":
+            setError("Entity not found or inactive.");
             break;
           default:
             setError(err.message || "An unexpected error occurred. Please try again.");
@@ -230,15 +225,10 @@ export default function CreateUser() {
   };
 
   const handleCopyCredentials = () => {
-    if (!registrationData) return;
-    const text = `Username: ${registrationData.credentials.username}\nPassword: ${registrationData.credentials.password || "N/A"}`;
+    if (!createResult) return;
+    const text = `Username: ${createResult.user.username}\nEmail: ${createResult.user.email}`;
     navigator.clipboard.writeText(text);
-    toast.success("Credentials copied to clipboard");
-  };
-
-  const handleSendWelcomeEmail = async () => {
-    // This would call an API endpoint to send welcome email
-    toast.info("Welcome email functionality would be implemented here");
+    toast.success("Details copied to clipboard");
   };
 
   const breadcrumbItems = [
@@ -272,7 +262,20 @@ export default function CreateUser() {
           {error && (
             <Alert variant="destructive" className="animate-in fade-in-0">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription asChild>
+                <div>
+                  <p className="font-medium">{error}</p>
+                  {validationErrors.length > 0 && (
+                    <ul className="list-disc list-inside text-sm mt-2">
+                      {validationErrors.map((e, i) => (
+                        <li key={i}>
+                          {e.field.replace(/^body\s*->\s*/i, "").replace(/_/g, " ")}: {e.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </AlertDescription>
             </Alert>
           )}
 
@@ -379,30 +382,28 @@ export default function CreateUser() {
                   )}
                 </div>
 
-                {role === "reporting_entity" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="entityId">Entity *</Label>
-                    <Select
-                      value={entityId || ""}
-                      onValueChange={(value) => setValue("entityId", value)}
-                      disabled={isLoadingEntities}
-                    >
-                      <SelectTrigger id="entityId">
-                        <SelectValue placeholder={isLoadingEntities ? "Loading..." : "Select reporting entity"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {entities.map((entity) => (
-                          <SelectItem key={entity.id} value={entity.id}>
-                            {entity.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.entityId && (
-                      <p className="text-sm text-destructive">{errors.entityId.message}</p>
-                    )}
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="entityId">Entity *</Label>
+                  <Select
+                    value={entityId || ""}
+                    onValueChange={(value) => setValue("entityId", value)}
+                    disabled={isLoadingEntities}
+                  >
+                    <SelectTrigger id="entityId">
+                      <SelectValue placeholder={isLoadingEntities ? "Loading..." : "Select entity"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {entities.map((entity) => (
+                        <SelectItem key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.entityId && (
+                    <p className="text-sm text-destructive">{errors.entityId.message}</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -484,15 +485,27 @@ export default function CreateUser() {
                 </div>
               )}
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="requirePasswordChange"
-                  {...register("requirePasswordChange")}
-                  defaultChecked
-                />
-                <Label htmlFor="requirePasswordChange" className="text-sm font-normal cursor-pointer">
-                  Require password change on first login
-                </Label>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="requirePasswordChange"
+                    {...register("requirePasswordChange")}
+                    defaultChecked
+                  />
+                  <Label htmlFor="requirePasswordChange" className="text-sm font-normal cursor-pointer">
+                    Require password change on first login
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="sendWelcomeEmail"
+                    {...register("sendWelcomeEmail")}
+                    defaultChecked
+                  />
+                  <Label htmlFor="sendWelcomeEmail" className="text-sm font-normal cursor-pointer">
+                    Send welcome email to user
+                  </Label>
+                </div>
               </div>
             </div>
 
@@ -501,7 +514,7 @@ export default function CreateUser() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate("/admin/users/all")}
+                onClick={() => navigate(-1)}
                 disabled={isLoading}
               >
                 Cancel
@@ -512,7 +525,7 @@ export default function CreateUser() {
                   isLoading ||
                   usernameAvailable === false ||
                   (passwordValidation !== null && !passwordValidation.isValid) ||
-                  (role === "reporting_entity" && !entityId)
+                  !entityId
                 }
               >
                 {isLoading ? (
@@ -539,61 +552,73 @@ export default function CreateUser() {
             </DialogDescription>
           </DialogHeader>
 
-          {registrationData && (
+          {createResult && (
             <div className="space-y-4">
+              {createResult.message && (
+                <p className="text-sm text-muted-foreground">{createResult.message}</p>
+              )}
               <div className="space-y-2">
-                <p className="text-sm font-medium">User Details:</p>
+                <p className="text-sm font-medium">User</p>
                 <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-                  <p><strong>User ID:</strong> {registrationData.user.id}</p>
-                  <p><strong>Full Name:</strong> {registrationData.user.fullName}</p>
-                  <p><strong>Username:</strong> {registrationData.user.username}</p>
-                  <p><strong>Email:</strong> {registrationData.user.email}</p>
-                  <p><strong>Role:</strong> {ROLE_LABELS[registrationData.user.role as keyof typeof ROLE_LABELS]}</p>
-                  {registrationData.user.entityId && (
-                    <p><strong>Entity:</strong> {registrationData.user.entityId}</p>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <p><strong>User ID:</strong> {createResult.user.id}</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(createResult.user.id);
+                        toast.success("User ID copied to clipboard");
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <p><strong>Username:</strong> {createResult.user.username}</p>
+                  <p><strong>Email:</strong> {createResult.user.email}</p>
+                  <p><strong>Role:</strong> {createResult.user.role}</p>
+                  <p><strong>Status:</strong> {createResult.user.account_status}</p>
+                  <p><strong>Entity:</strong> {createResult.user.entity_name}</p>
                 </div>
               </div>
-
               <div className="space-y-2">
-                <p className="text-sm font-medium">Credentials:</p>
+                <p className="text-sm font-medium">Entity</p>
                 <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-                  <p><strong>Username:</strong> {registrationData.credentials.username}</p>
-                  {registrationData.credentials.password && (
-                    <p><strong>Password:</strong> {registrationData.credentials.password}</p>
-                  )}
+                  <p><strong>Name:</strong> {createResult.entity.name}</p>
+                  <p><strong>Type:</strong> {createResult.entity.entity_type}</p>
+                  <p><strong>Registration:</strong> {createResult.entity.registration_number}</p>
                 </div>
-                {registrationData.user.requiresPasswordChange && (
-                  <p className="text-sm text-yellow-600">User must change password on first login</p>
-                )}
               </div>
-
+              {createResult.welcome_email && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Welcome email</p>
+                  <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
+                    <p><strong>Sent:</strong> {createResult.welcome_email.email_sent ? "Yes" : "No"}</p>
+                    {createResult.welcome_email.recipient_email && (
+                      <p><strong>To:</strong> {createResult.welcome_email.recipient_email}</p>
+                    )}
+                    {createResult.welcome_email.message && (
+                      <p className="text-muted-foreground">{createResult.welcome_email.message}</p>
+                    )}
+                  </div>
+                </div>
+              )}
               <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button variant="outline" onClick={handleCopyCredentials}>
                   <Copy className="h-4 w-4 mr-2" />
-                  Copy Credentials
-                </Button>
-                <Button variant="outline" onClick={handleSendWelcomeEmail}>
-                  <Mail className="h-4 w-4 mr-2" />
-                  Send Welcome Email
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(`/admin/users/${registrationData.user.id}`)}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View User
+                  Copy details
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => {
                     setShowSuccessDialog(false);
-                    window.location.reload();
+                    setCreateResult(null);
                   }}
                 >
-                  Create Another
+                  Create another
                 </Button>
-                <Button onClick={() => navigate("/admin/users/all")}>
+                <Button onClick={() => navigate("/entities")}>
                   Done
                 </Button>
               </DialogFooter>

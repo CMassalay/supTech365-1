@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { authApi, ApiError } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { validatePassword, type PasswordValidationResult } from "@/lib/password-validation";
 import { toast } from "sonner";
 
@@ -91,8 +92,11 @@ export function PasswordChangeModal({ open, onSuccess }: PasswordChangeModalProp
     setIsLoading(true);
 
     try {
-      await authApi.changePassword(data.currentPassword, data.newPassword, data.confirmPassword);
-      toast.success("Password changed successfully!");
+      const res = await authApi.changePassword(data.currentPassword, data.newPassword, data.confirmPassword);
+      if (res.password_change_required === false) {
+        clearPasswordChangeRequired();
+      }
+      toast.success(res.message || "Password changed successfully!");
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -123,12 +127,12 @@ export function PasswordChangeModal({ open, onSuccess }: PasswordChangeModalProp
   return (
     <Dialog open={open} modal={true}>
       <DialogContent
-        className="sm:max-w-[500px]"
+        className="sm:max-w-[500px] max-h-[90vh] flex flex-col overflow-hidden"
         onEscapeKeyDown={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Lock className="h-5 w-5" />
             Change Your Password
@@ -138,6 +142,7 @@ export function PasswordChangeModal({ open, onSuccess }: PasswordChangeModalProp
           </DialogDescription>
         </DialogHeader>
 
+        <div className="overflow-y-auto flex-1 min-h-0 -mx-6 px-6">
         {error && (
           <Alert variant="destructive" className="animate-in fade-in-0">
             <AlertCircle className="h-4 w-4" />
@@ -277,6 +282,7 @@ export function PasswordChangeModal({ open, onSuccess }: PasswordChangeModalProp
             )}
           </Button>
         </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -51,6 +51,7 @@ import ValidationResult from "./pages/reporting-entity/ValidationResult";
 import ValidationErrorReport from "./pages/reporting-entity/ValidationErrorReport";
 import Resubmissions from "./pages/reporting-entity/Resubmissions";
 import Statistics from "./pages/reporting-entity/Statistics";
+import MyEntityPage from "./pages/reporting-entity/MyEntityPage";
 import ManualValidationQueue from "./pages/compliance/ManualValidationQueue";
 import ReportReview from "./pages/compliance/ReportReview";
 import ValidationAuditLogs from "./pages/compliance/ValidationAuditLogs";
@@ -62,6 +63,9 @@ import EntitiesPage from "./pages/admin/EntitiesPage";
 import EntityDetailPage from "./pages/admin/EntityDetailPage";
 import SessionsPage from "./pages/admin/SessionsPage";
 import ProfilePage from "./pages/profile/ProfilePage";
+import SubjectSearchPage from "./pages/subjects/SubjectSearchPage";
+import SubjectProfilePage from "./pages/subjects/SubjectProfilePage";
+import ApiCredentialsPage from "./pages/reporting-entity/ApiCredentialsPage";
 
 const queryClient = new QueryClient();
 
@@ -168,12 +172,17 @@ const App = () => (
               />
               {/* Reporting Entity Workspace Routes (f2.md Section 2.1) */}
               <Route path="/submit" element={<SubmitReport />} />
+              <Route path="/my-entity" element={<MyEntityPage />} />
               <Route path="/submissions" element={<MySubmissions />} />
               <Route path="/submissions/:id" element={<SubmissionDetail />} />
               <Route path="/submissions/:id/result" element={<ValidationResult />} />
               <Route path="/submissions/:id/errors" element={<ValidationErrorReport />} />
               <Route path="/resubmissions" element={<Resubmissions />} />
               <Route path="/statistics" element={<Statistics />} />
+              <Route path="/api-credentials" element={<ApiCredentialsPage />} />
+              {/* Subject Profiling (FDD Feature 7) */}
+              <Route path="/subjects" element={<SubjectSearchPage />} />
+              <Route path="/subjects/:uuid" element={<SubjectProfilePage />} />
               {/* Compliance Workspace Routes (f2.md Section 2.2) */}
               <Route path="/compliance/validation" element={<ValidationQueue />} />
               <Route path="/compliance/validation/pending" element={<PendingValidations />} />

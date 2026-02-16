@@ -3,6 +3,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -14,22 +15,29 @@ import {
 } from "@/components/ui/table";
 import { registrationApi } from "@/lib/api";
 import type { Entity } from "@/lib/api";
-import { FileText, RefreshCw, Search } from "lucide-react";
+import { FileText, RefreshCw, Search, Copy } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+
+const PAGE_SIZE = 20;
 
 export default function EntitiesPage() {
   const navigate = useNavigate();
   const [entities, setEntities] = useState<Entity[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isLookingUp, setIsLookingUp] = useState(false);
 
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
   const load = async () => {
     setIsLoading(true);
     try {
-      const res = await registrationApi.getEntities({ limit: 500, offset: 0 });
+      const offset = page * PAGE_SIZE;
+      const res = await registrationApi.getEntities({ limit: PAGE_SIZE, offset });
+      console.log("Entities response:", res);
       setEntities(res.data || []);
       setTotal(res.total ?? 0);
     } catch {
@@ -42,7 +50,7 @@ export default function EntitiesPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [page]);
 
   const handleSearchSubmit = async () => {
     const q = search.trim();
@@ -122,6 +130,7 @@ export default function EntitiesPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
+                    <TableHead className="w-[180px]">ID</TableHead>
                     <TableHead>name</TableHead>
                     <TableHead>entity_type</TableHead>
                     <TableHead>registration_number</TableHead>
@@ -133,13 +142,13 @@ export default function EntitiesPage() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Loading...
                       </TableCell>
                     </TableRow>
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No entities found.
                       </TableCell>
                     </TableRow>
@@ -150,6 +159,30 @@ export default function EntitiesPage() {
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => navigate(`/entities/${e.id}`)}
                       >
+                        <TableCell onClick={(ev) => ev.stopPropagation()} className="font-mono text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate max-w-[140px]" title={e.id}>
+                              {e.id.slice(0, 8)}…
+                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(e.id);
+                                    toast.success("Entity ID copied");
+                                  }}
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Copy ID</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TableCell>
                         <TableCell className="font-medium">{e.name}</TableCell>
                         <TableCell>{e.entity_type}</TableCell>
                         <TableCell>{e.registration_number}</TableCell>
@@ -176,9 +209,34 @@ export default function EntitiesPage() {
                 </TableBody>
               </Table>
             </div>
-            <p className="text-sm text-muted-foreground mt-4">
-              Showing {filtered.length} of {total}. Click a row or View to open details.
-            </p>
+            <div className="flex items-center justify-between mt-4 flex-wrap gap-2">
+              <p className="text-sm text-muted-foreground">
+                Showing {entities.length} of {total} (page {page + 1} of {totalPages}). Click a row or View to open details.
+              </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0 || isLoading}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground min-w-[80px] text-center">
+                    Page {page + 1} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => p + 1)}
+                    disabled={page >= totalPages - 1 || isLoading}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

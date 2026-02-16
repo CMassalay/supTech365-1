@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 export default function ChangePasswordRequired() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -13,8 +13,9 @@ export default function ChangePasswordRequired() {
     }
   }, [isAuthenticated, user, navigate]);
 
-  const handleSuccess = () => {
-    navigate("/");
+  const handleSuccess = async () => {
+    await logout();
+    navigate("/login", { replace: true });
   };
 
   return (
