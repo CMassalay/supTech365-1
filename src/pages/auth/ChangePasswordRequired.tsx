@@ -3,9 +3,21 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
 
+const ROLE_DEFAULT_ROUTES: Record<string, string> = {
+  reporting_entity: "/submissions",
+  compliance_officer: "/compliance/validation",
+  head_of_compliance: "/compliance/dashboards/processing",
+  analyst: "/analysis-queue",
+  head_of_analysis: "/analysis-queue",
+  director_ops: "/",
+  oic: "/",
+  tech_admin: "/",
+  super_admin: "/",
+};
+
 export default function ChangePasswordRequired() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, clearPasswordChangeRequired } = useAuth();
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -13,9 +25,10 @@ export default function ChangePasswordRequired() {
     }
   }, [isAuthenticated, user, navigate]);
 
-  const handleSuccess = async () => {
-    await logout();
-    navigate("/login", { replace: true });
+  const handleSuccess = () => {
+    clearPasswordChangeRequired();
+    const route = user ? ROLE_DEFAULT_ROUTES[user.role] ?? "/" : "/";
+    navigate(route, { replace: true });
   };
 
   return (

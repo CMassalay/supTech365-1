@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { authApi, ApiError } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { validateEmail, validateUsername } from "@/lib/password-validation";
-import { mapBackendRole } from "@/types/roles";
+import { mapBackendRole, type UserRole } from "@/types/roles";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
@@ -22,6 +22,25 @@ const loginSchema = z.object({
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
+
+/** Only use returnUrl if it belongs to the logged-in role's workspace (avoids sending e.g. reporting entity to /compliance/dashboards). */
+function isReturnUrlAllowedForRole(returnUrl: string, role: UserRole): boolean {
+  const path = returnUrl.split("?")[0];
+  if (role === "reporting_entity") {
+    const allowed = ["/", "/submit", "/submissions", "/resubmissions", "/statistics", "/my-entity", "/api-credentials"];
+    return allowed.some((p) => path === p || (p !== "/" && path.startsWith(p + "/")));
+  }
+  if (role === "compliance_officer" || role === "head_of_compliance") {
+    return path === "/" || path.startsWith("/compliance");
+  }
+  if (role === "analyst" || role === "head_of_analysis") {
+    return path === "/" || path.startsWith("/analysis") || path.startsWith("/my-assignments") || path.startsWith("/subjects");
+  }
+  if (role === "tech_admin" || role === "super_admin") {
+    return true;
+  }
+  return path === "/" || path.startsWith("/");
+}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -104,23 +123,25 @@ export default function Login() {
       }
       toast.success(`Welcome back, ${response.user.username}!`);
 
+      const role = mapBackendRole(response.user.role);
+      const roleRoutes: Record<string, string> = {
+        reporting_entity: "/submissions",
+        compliance_officer: "/compliance/validation",
+        head_of_compliance: "/compliance/dashboards/processing",
+        analyst: "/analysis-queue",
+        head_of_analysis: "/analysis-queue",
+        director_ops: "/",
+        oic: "/",
+        tech_admin: "/",
+        super_admin: "/",
+      };
+      const defaultRoute = roleRoutes[role] ?? "/";
+
       const returnUrl = searchParams.get("returnUrl");
-      if (returnUrl && returnUrl.startsWith("/")) {
+      if (returnUrl && returnUrl.startsWith("/") && isReturnUrlAllowedForRole(returnUrl, role)) {
         navigate(returnUrl);
       } else {
-        const role = mapBackendRole(response.user.role);
-        const roleRoutes: Record<string, string> = {
-          reporting_entity: "/submissions",
-          compliance_officer: "/compliance/validation/assigned",
-          head_of_compliance: "/compliance/dashboards",
-          analyst: "/analysis/queue/assigned",
-          head_of_analysis: "/analysis/dashboards",
-          director_ops: "/audit/dashboards/director-ops",
-          oic: "/audit/dashboards/oic",
-          tech_admin: "/",
-          super_admin: "/",
-        };
-        navigate(roleRoutes[role] || "/");
+        navigate(defaultRoute);
       }
     } catch (err) {
       if (err instanceof ApiError) {

@@ -9,12 +9,17 @@ export type UserRole =
   | "tech_admin"
   | "super_admin";
 
-/** Map backend role (e.g. SUPER_ADMIN, "Reporting Entity User") to app UserRole */
+/**
+ * Map backend role string to app UserRole.
+ * Backend sends human-readable names (e.g. "Reporting Entity User") or slugs.
+ * Used for login, profile, sidebar (2.1 Reporting Entity Workspace), and redirects.
+ */
 export function mapBackendRole(backendRole: string): UserRole {
-  const normalized = backendRole?.toLowerCase().replace(/-/g, "_").replace(/\s+/g, "_") || "";
+  const normalized = backendRole?.toLowerCase().replace(/-/g, "_").replace(/\s+/g, "_").trim() || "";
   const mapping: Record<string, UserRole> = {
     super_admin: "super_admin",
     tech_admin: "tech_admin",
+    // Backend: "Reporting Entity User" → reporting_entity (2.1 Reporting Entity Workspace)
     reporting_entity: "reporting_entity",
     reporting_entity_user: "reporting_entity",
     compliance_officer: "compliance_officer",
