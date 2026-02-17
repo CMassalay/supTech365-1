@@ -805,3 +805,128 @@ export async function submitExcelReport(
 
   return body as ExcelSubmissionResponse;
 }
+
+// --- Submission API (reporting entity): templates, list, status, recent ---
+
+export type SubmissionReportType = "STR" | "CTR" | "Monthly" | "Quarterly";
+
+export interface SubmissionStatusResponse {
+  reference: string;
+  status: string;
+  report_type: string;
+  submitted_at: string;
+  last_updated_at?: string;
+  entity_report_id?: string;
+  notes?: string;
+}
+
+export interface SubmissionListItem {
+  reference: string;
+  status: string;
+  report_type: string;
+  submitted_at: string;
+  entity_report_id?: string;
+}
+
+export interface ListSubmissionsResponse {
+  submissions: SubmissionListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages?: number;
+  has_more?: boolean;
+}
+
+export interface ListSubmissionsParams {
+  status?: string;
+  report_type?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** GET /api/v1/submission/templates/{report_type} - Download Excel template (STR or CTR). Triggers browser download. */
+export async function downloadSubmissionTemplate(
+  reportType: "STR" | "CTR"
+): Promise<void> {
+  const token = getStoredToken();
+  if (!token) {
+    throw new ApiError("UNAUTHORIZED", "Authentication required", 401);
+  }
+  const url = `${API_BASE_URL}/api/v1/submission/templates/${encodeURIComponent(reportType)}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "omit",
+  });
+
+  if (!response.ok) {
+    const ct = response.headers.get("content-type") || "";
+    const body = ct.includes("application/json")
+      ? await response.json().catch(() => ({}))
+      : await response.text();
+    const message =
+      typeof body === "object" && body !== null && "detail" in body
+        ? String((body as { detail?: unknown }).detail)
+        : response.statusText || "Download failed";
+    throw new ApiError(
+      response.status === 401 ? "UNAUTHORIZED" : response.status === 404 ? "NOT_FOUND" : "DOWNLOAD_ERROR",
+      message,
+      response.status,
+      body
+    );
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition");
+  let filename = `${reportType}_Template.xlsx`;
+  if (disposition) {
+    const match = /filename[*]?=(?:UTF-8'')?["']?([^"'\s;]+)["']?/i.exec(disposition) ?? /filename=["']?([^"'\s;]+)["']?/i.exec(disposition);
+    if (match?.[1]) filename = match[1].replace(/^["']|["']$/g, "").trim();
+  }
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+/** GET /api/v1/submission/{reference_number}/status */
+export async function getSubmissionStatus(referenceNumber: string): Promise<SubmissionStatusResponse> {
+  return apiRequest<SubmissionStatusResponse>(
+    `/api/v1/submission/${encodeURIComponent(referenceNumber)}/status`,
+    { method: "GET" }
+  );
+}
+
+/** GET /api/v1/submission/ - List submissions with filters and pagination */
+export async function listSubmissions(params: ListSubmissionsParams = {}): Promise<ListSubmissionsResponse> {
+  const q = new URLSearchParams();
+  if (params.status != null) q.set("status", params.status);
+  if (params.report_type != null) q.set("report_type", params.report_type);
+  if (params.start_date != null) q.set("start_date", params.start_date);
+  if (params.end_date != null) q.set("end_date", params.end_date);
+  if (params.search != null) q.set("search", params.search);
+  if (params.page != null) q.set("page", String(params.page));
+  if (params.limit != null) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  return apiRequest<ListSubmissionsResponse>(`/api/v1/submission/${qs ? `?${qs}` : ""}`, { method: "GET" });
+}
+
+/** GET /api/v1/submission/recent */
+export async function getRecentSubmissions(limit: number = 10): Promise<ListSubmissionsResponse> {
+  return apiRequest<ListSubmissionsResponse>(`/api/v1/submission/recent?limit=${Math.min(50, Math.max(1, limit))}`, {
+    method: "GET",
+  });
+}

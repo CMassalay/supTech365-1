@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { Upload, FileText, Download, Link2, CheckCircle2, X, Info, Mail, BarChart3, ClipboardList, Eye, AlertTriangle } from "lucide-react";
+import { Upload, FileText, Download, Link2, CheckCircle2, X, Info, Mail, BarChart3, ClipboardList, Eye, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { submitExcelReport, ApiError } from "@/lib/api";
+import { submitExcelReport, downloadSubmissionTemplate, ApiError } from "@/lib/api";
 import { toast } from "sonner";
 
 const MAX_FILE_SIZE_MB = 10;
@@ -30,6 +30,7 @@ export default function SubmitReport() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [entityReference, setEntityReference] = useState("");
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [templateDownloading, setTemplateDownloading] = useState<"STR" | "CTR" | null>(null);
 
   const breadcrumbItems = [
     { label: "Reporting Entity Workspace", icon: <FileText className="h-5 w-5" /> },
@@ -110,6 +111,19 @@ export default function SubmitReport() {
     setSuccessRefNumber("");
     setSuccessTimestamp("");
     setUploadError(null);
+  };
+
+  const handleDownloadTemplate = async (reportType: "STR" | "CTR") => {
+    setTemplateDownloading(reportType);
+    try {
+      await downloadSubmissionTemplate(reportType);
+      toast.success(`${reportType} template downloaded.`);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Download failed. Please try again.";
+      toast.error(message);
+    } finally {
+      setTemplateDownloading(null);
+    }
   };
 
   return (
@@ -205,8 +219,17 @@ export default function SubmitReport() {
                   <p className="text-sm text-muted-foreground">Suspicious Transaction Report Template</p>
                   <p className="text-xs text-muted-foreground mt-1">Version: 2.0 | Updated: Jan 2026</p>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={templateDownloading !== null}
+                  onClick={() => handleDownloadTemplate("STR")}
+                >
+                  {templateDownloading === "STR" ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
                   Download .xlsx
                 </Button>
               </CardContent>
@@ -222,8 +245,17 @@ export default function SubmitReport() {
                   <p className="text-sm text-muted-foreground">Currency Transaction Report Template</p>
                   <p className="text-xs text-muted-foreground mt-1">Version: 2.0 | Updated: Jan 2026</p>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={templateDownloading !== null}
+                  onClick={() => handleDownloadTemplate("CTR")}
+                >
+                  {templateDownloading === "CTR" ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
                   Download .xlsx
                 </Button>
               </CardContent>
