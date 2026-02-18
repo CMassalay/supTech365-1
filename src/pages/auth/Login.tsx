@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { authApi, ApiError } from "@/lib/api";
+import { authApi, ApiError, getValidationErrors, getFriendlyErrorMessage } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { validateEmail, validateUsername } from "@/lib/password-validation";
 import { mapBackendRole, type UserRole } from "@/types/roles";
@@ -55,6 +55,8 @@ export default function Login() {
   const {
     register,
     handleSubmit,
+    setError: setFormError,
+    clearErrors,
     formState: { errors },
     setFocus,
   } = useForm<LoginFormData>({
@@ -90,6 +92,7 @@ export default function Login() {
 
   const onSubmit = async (data: LoginFormData) => {
     setError(null);
+    clearErrors();
     setIsLoading(true);
 
     try {
@@ -145,36 +148,47 @@ export default function Login() {
       }
     } catch (err) {
       if (err instanceof ApiError) {
+        const details = getValidationErrors(err);
+        if (details?.length) {
+          details.forEach((e) => {
+            const field = e.field.replace(/^body\s*->\s*/i, "").trim().replace(/-/g, "");
+            if (field === "username" || field === "password") {
+              setFormError(field as "username" | "password", { type: "server", message: e.message });
+            }
+          });
+        }
         switch (err.code) {
           case "INVALID_CREDENTIALS":
             setError("Invalid username or password. Please try again.");
             break;
-          case "ACCOUNT_LOCKED":
+          case "ACCOUNT_LOCKED": {
             const lockoutTime = err.data?.lockoutExpiresAt
-              ? new Date(err.data.lockoutExpiresAt)
+              ? new Date((err.data as { lockoutExpiresAt?: string }).lockoutExpiresAt)
               : null;
-            const minutes = err.data?.remainingMinutes || null;
+            const minutes = (err.data as { remainingMinutes?: number })?.remainingMinutes ?? null;
             setLockoutExpiresAt(lockoutTime);
             setRemainingMinutes(minutes);
             setError(
               `Account locked due to multiple failed login attempts. Please try again in ${minutes} minutes.`
             );
             break;
+          }
           case "ACCOUNT_DISABLED":
             setError("Your account has been disabled. Please contact support at support@fia.gov.lr");
             break;
-          case "RATE_LIMIT_EXCEEDED":
-            const retryAfter = err.data?.retryAfter || 60;
+          case "RATE_LIMIT_EXCEEDED": {
+            const retryAfter = (err.data as { retryAfter?: number })?.retryAfter ?? 60;
             setError(`Too many login attempts. Please try again in ${retryAfter} seconds.`);
             break;
+          }
           case "SESSION_EXPIRED":
             setError("Your session has expired. Please log in again.");
             break;
           default:
-            setError(err.message || "An unexpected error occurred. Please try again.");
+            setError(details?.length ? "Please fix the errors below." : getFriendlyErrorMessage(err));
         }
       } else {
-        setError("Connection error. Please check your internet connection and try again.");
+        setError("We couldn't sign you in. Please check your connection and try again.");
       }
     } finally {
       setIsLoading(false);

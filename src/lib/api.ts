@@ -109,6 +109,23 @@ export function getValidationErrors(err: ApiError): ValidationErrorItem[] | null
     .map((e) => ({ field: (e as any).field, message: (e as any).message, type: (e as any).type }));
 }
 
+/** Map API error to a short, user-friendly message for display in the UI. */
+export function getFriendlyErrorMessage(err: ApiError): string {
+  if (err.code === "VALIDATION_ERROR") {
+    return "Please fix the errors in the form and try again.";
+  }
+  const friendly: Record<string, string> = {
+    UNAUTHORIZED: "Please sign in again.",
+    FORBIDDEN: "You don't have permission to do this.",
+    NOT_FOUND: "The requested item was not found.",
+    CONFLICT: "This conflicts with existing data. Please check and try again.",
+    BAD_REQUEST: "Invalid request. Please check your input.",
+    SERVER_ERROR: "Something went wrong on our side. Please try again later.",
+    NETWORK_ERROR: "Unable to connect. Check your connection and try again.",
+  };
+  return friendly[err.code] || err.message || "Something went wrong. Please try again.";
+}
+
 /** Parse API error body into code and message. Handles { success: false, error: { code, message, details } }, detail, etc. */
 function parseErrorBody(
   body: unknown,

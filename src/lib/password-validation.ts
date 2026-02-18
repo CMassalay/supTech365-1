@@ -84,3 +84,25 @@ export function validatePhone(phone: string): boolean {
   const phoneRegex = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/;
   return phoneRegex.test(phone) && phone.replace(/\D/g, "").length >= 8;
 }
+
+const UPPERCASE = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+const LOWERCASE = "abcdefghjkmnpqrstuvwxyz";
+const NUMBERS = "23456789";
+const SPECIAL = "@$!%*?&";
+
+/**
+ * Generates a strong password that meets all validation requirements:
+ * 12+ chars, uppercase, lowercase, number, special character.
+ */
+export function generateStrongPassword(length: number = 16): string {
+  const all = UPPERCASE + LOWERCASE + NUMBERS + SPECIAL;
+  const pick = (str: string) => str[Math.floor(Math.random() * str.length)];
+  let password = pick(UPPERCASE) + pick(LOWERCASE) + pick(NUMBERS) + pick(SPECIAL);
+  for (let i = password.length; i < length; i++) {
+    password += all[Math.floor(Math.random() * all.length)];
+  }
+  return password
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
+}
