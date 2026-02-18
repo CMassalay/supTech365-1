@@ -684,6 +684,32 @@ export interface AssignRoleResponse {
   success: boolean;
 }
 
+/** Request for POST /api/v1/admin/roles/bulk-assign */
+export interface BulkAssignRolePayload {
+  user_ids: string[];
+  role_name: string;
+}
+
+/** Single result item in bulk assign response */
+export interface BulkAssignRoleResultItem {
+  user_id: string;
+  username: string;
+  old_role: string;
+  new_role: string;
+  message: string;
+  success: boolean;
+}
+
+/** Response from POST /api/v1/admin/roles/bulk-assign */
+export interface BulkAssignRoleResponse {
+  total_users: number;
+  successful_assignments: number;
+  failed_assignments: number;
+  role_name: string;
+  results: BulkAssignRoleResultItem[];
+  message: string;
+}
+
 export const adminApi = {
   createEntityUser: async (payload: CreateEntityUserPayload): Promise<CreateEntityUserResponse> => {
     return apiRequest<CreateEntityUserResponse>("/api/v1/admin/users/create", {
@@ -748,6 +774,14 @@ export const adminApi = {
 
   assignRoleToUser: async (payload: AssignRolePayload): Promise<AssignRoleResponse> => {
     return apiRequest<AssignRoleResponse>("/api/v1/admin/roles/assign", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** POST /api/v1/admin/roles/bulk-assign - Assign a role to multiple users at once. */
+  bulkAssignRole: async (payload: BulkAssignRolePayload): Promise<BulkAssignRoleResponse> => {
+    return apiRequest<BulkAssignRoleResponse>("/api/v1/admin/roles/bulk-assign", {
       method: "POST",
       body: JSON.stringify(payload),
     });

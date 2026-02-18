@@ -25,6 +25,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -34,9 +42,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { registrationApi } from "@/lib/api";
-import type { Entity, UpdateEntityPayload } from "@/lib/api";
-import { FileText, Pencil, Trash2, ArrowLeft, Copy } from "lucide-react";
+import { registrationApi, entityApi } from "@/lib/api";
+import type { Entity, UpdateEntityPayload, EntityUser } from "@/lib/api";
+import { FileText, Pencil, Trash2, ArrowLeft, Copy, Users } from "lucide-react";
 import { toast } from "sonner";
 
 const updateSchema = z.object({
@@ -52,8 +60,11 @@ export default function EntityDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [entity, setEntity] = useState<Entity | null>(null);
+  const [entityUsers, setEntityUsers] = useState<EntityUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [usersError, setUsersError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -91,6 +102,27 @@ export default function EntityDetailPage() {
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setUsersError(null);
+    setUsersLoading(true);
+    entityApi
+      .getEntityUsers(id)
+      .then((users) => {
+        if (!cancelled) setEntityUsers(users);
+      })
+      .catch(() => {
+        if (!cancelled) setUsersError("Failed to load users.");
+      })
+      .finally(() => {
+        if (!cancelled) setUsersLoading(false);
       });
     return () => {
       cancelled = true;
@@ -269,6 +301,67 @@ export default function EntityDetailPage() {
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Entity users
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {usersLoading && (
+                  <p className="text-sm text-muted-foreground py-4">Loading users…</p>
+                )}
+                {usersError && (
+                  <p className="text-sm text-destructive py-4">{usersError}</p>
+                )}
+                {!usersLoading && !usersError && entityUsers.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-4">No users for this entity.</p>
+                )}
+                {!usersLoading && !usersError && entityUsers.length > 0 && (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Username</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>User ID</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {entityUsers.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">{user.username}</TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs text-muted-foreground truncate max-w-[12rem] sm:max-w-none" title={user.id}>
+                                  {user.id}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(user.id);
+                                    toast.success("User ID copied to clipboard");
+                                  }}
+                                  aria-label="Copy user ID"
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </>

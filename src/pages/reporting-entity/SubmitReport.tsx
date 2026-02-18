@@ -265,16 +265,16 @@ export default function SubmitReport() {
 
         {/* Upload Dialog */}
         <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-            <DialogHeader className="shrink-0">
-              <DialogTitle>
+          <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[85dvh] sm:max-h-[90vh] flex flex-col overflow-hidden p-4 sm:p-6 left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]">
+            <DialogHeader className="shrink-0 pr-8">
+              <DialogTitle className="text-base sm:text-lg">
                 {uploadStatus === "uploading" ? "Uploading Report..." : 
                  uploadStatus === "success" ? "Report Submitted Successfully" : 
                  "Upload Report"}
               </DialogTitle>
             </DialogHeader>
 
-            <div className="overflow-y-auto flex-1 min-h-0 -mx-6 px-6">
+            <div className="overflow-y-auto flex-1 min-h-0 -mx-4 px-4 sm:-mx-6 sm:px-6">
             {uploadStatus === "idle" && (
               <>
                 <DialogDescription>
@@ -291,15 +291,15 @@ export default function SubmitReport() {
                     />
                   </div>
                   <div
-                    className="border-2 border-dashed rounded-lg p-12 text-center cursor-pointer hover:border-primary transition-colors"
+                    className="border-2 border-dashed rounded-lg p-6 sm:p-12 text-center cursor-pointer hover:border-primary transition-colors touch-manipulation"
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
                     onClick={() => document.getElementById("file-upload")?.click()}
                   >
-                    <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="font-medium mb-1">Drag and drop file here</p>
-                    <p className="text-sm text-muted-foreground mb-4">or</p>
-                    <Button>Browse Files</Button>
+                    <Upload className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted-foreground mb-3 sm:mb-4" />
+                    <p className="font-medium mb-1 text-sm sm:text-base">Drag and drop file here</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">or</p>
+                    <Button className="w-full sm:w-auto">Browse Files</Button>
                     <Input
                       id="file-upload"
                       type="file"
@@ -307,7 +307,7 @@ export default function SubmitReport() {
                       className="hidden"
                       onChange={handleFileSelect}
                     />
-                    <p className="text-xs text-muted-foreground mt-4">
+                    <p className="text-xs text-muted-foreground mt-3 sm:mt-4">
                       Accepted formats: .xlsx (Excel 2007+)<br />
                       Maximum file size: {MAX_FILE_SIZE_MB}MB
                     </p>
@@ -326,8 +326,8 @@ export default function SubmitReport() {
                     </div>
                   )}
 
-                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4 space-y-2">
-                    <p className="text-sm font-medium flex items-center gap-2"><Info className="h-4 w-4 shrink-0" /> Important Notes:</p>
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md p-3 sm:p-4 space-y-2">
+                    <p className="text-xs sm:text-sm font-medium flex items-center gap-2"><Info className="h-4 w-4 shrink-0" /> Important Notes:</p>
                     <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
                       <li>Ensure all mandatory fields are completed</li>
                       <li>Use the latest template version (2.0)</li>
@@ -336,11 +336,11 @@ export default function SubmitReport() {
                     </ul>
                   </div>
 
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button variant="outline" className="w-full sm:w-auto" onClick={() => setUploadDialogOpen(false)}>
                       Cancel
                     </Button>
-                    <Button onClick={handleUpload} disabled={!selectedFile}>
+                    <Button className="w-full sm:w-auto" onClick={handleUpload} disabled={!selectedFile}>
                       Upload Report
                     </Button>
                   </div>
@@ -365,12 +365,12 @@ export default function SubmitReport() {
 
             {uploadStatus === "success" && (
               <div className="space-y-4">
-                <div className="text-center py-4">
-                  <CheckCircle2 className="h-16 w-16 mx-auto text-green-600 mb-4" />
-                  <p className="text-lg font-semibold mb-4">Your report has been submitted</p>
+                <div className="text-center py-2 sm:py-4">
+                  <CheckCircle2 className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-green-600 mb-3 sm:mb-4" />
+                  <p className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Your report has been submitted</p>
                 </div>
 
-                <div className="space-y-2 bg-muted p-4 rounded-md">
+                <div className="space-y-2 bg-muted p-3 sm:p-4 rounded-md text-sm">
                   <p><span className="font-medium">Reference Number:</span> {successRefNumber}</p>
                   <p><span className="font-medium">Report Type:</span> {reportType}</p>
                   <p><span className="font-medium">Submitted:</span> {successTimestamp ? new Date(successTimestamp).toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : new Date().toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
@@ -384,8 +384,8 @@ export default function SubmitReport() {
                   <p className="text-sm text-muted-foreground">compliance@bankofmonrovia.lr</p>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4 space-y-2">
-                  <p className="text-sm font-medium">Next Steps:</p>
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md p-3 sm:p-4 space-y-2">
+                  <p className="text-xs sm:text-sm font-medium">Next Steps:</p>
                   <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
                     <li>Your report will undergo automated validation</li>
                     <li>You will be notified of the validation outcome</li>
@@ -393,11 +393,12 @@ export default function SubmitReport() {
                   </ul>
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={handleUploadComplete}>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button variant="outline" className="w-full sm:w-auto" onClick={handleUploadComplete}>
                     Submit Another
                   </Button>
                   <Button
+                    className="w-full sm:w-auto"
                     onClick={() => {
                       handleUploadComplete();
                       navigate("/submissions");
