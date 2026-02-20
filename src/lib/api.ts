@@ -151,16 +151,18 @@ function parseErrorBody(
       }
       return { code, message };
     }
-    // Top-level code/message
+    // Top-level code/message (many APIs use "detail" e.g. 400/403/413)
     const code = typeof b.code === "string" ? b.code : "UNKNOWN_ERROR";
-    const message =
-      typeof b.message === "string"
-        ? b.message
-        : status === 422 && b.detail
-          ? Array.isArray(b.detail)
-            ? parse422Detail(b.detail).message
-            : String(b.detail)
-          : fallbackMessage;
+    let message = typeof b.message === "string" ? b.message : fallbackMessage;
+    if (message === fallbackMessage && b.detail != null) {
+      if (typeof b.detail === "string") {
+        message = b.detail;
+      } else if (status === 422 && Array.isArray(b.detail)) {
+        message = parse422Detail(b.detail).message;
+      } else if (status === 422) {
+        message = String(b.detail);
+      }
+    }
     return { code, message };
   }
   return { code: "UNKNOWN_ERROR", message: fallbackMessage };
@@ -396,6 +398,8 @@ export interface RegisterEntityPayload {
   username: string;
   email: string;
   password: string;
+  /** If true, issue API credentials for the entity. */
+  issue_api_credentials?: boolean;
 }
 
 export interface RegisterEntityResponse {
@@ -459,17 +463,16 @@ const REGISTER_ENTITY_KEYS: (keyof RegisterEntityPayload)[] = [
   "username",
   "email",
   "password",
+  "issue_api_credentials",
 ];
 
 export const registrationApi = {
   registerEntity: async (payload: RegisterEntityPayload): Promise<RegisterEntityResponse> => {
-    const body = REGISTER_ENTITY_KEYS.reduce(
-      (acc, key) => {
-        acc[key] = payload[key];
-        return acc;
-      },
-      {} as RegisterEntityPayload
-    );
+    const body: Record<string, unknown> = {};
+    for (const key of REGISTER_ENTITY_KEYS) {
+      const v = payload[key];
+      if (v !== undefined) body[key] = v;
+    }
     return apiRequest<RegisterEntityResponse>("/api/v1/admin/entities/register", {
       method: "POST",
       body: JSON.stringify(body),
@@ -548,12 +551,31 @@ export interface EntityApiKey {
   entity_name?: string;
   key_name: string;
   key_prefix?: string;
+  /** Only present once when key is created; never in list responses. */
+  api_key?: string;
   is_active: boolean;
   created_at: string;
+  created_by_id?: string | null;
   last_used_at?: string | null;
   expires_at?: string | null;
   revoked_at?: string | null;
+  revoked_by_id?: string | null;
   revocation_reason?: string | null;
+}
+
+/** Response from GET /api/v1/admin/api-keys (list all with pagination). */
+export interface AdminApiKeysListResponse {
+  items: EntityApiKey[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+/** Payload for POST /api/v1/admin/api-keys (create API key). */
+export interface CreateAdminApiKeyPayload {
+  entity_id: string;
+  key_name: string;
+  expires_in_days?: number;
 }
 
 /** API for reporting entity users: update own entity, list users, list API keys. (No GET entity - admin only.) */
@@ -786,6 +808,53 @@ export const adminApi = {
       body: JSON.stringify(payload),
     });
   },
+
+  // --- Admin API Keys (SUPER_ADMIN / TECH_ADMIN) ---
+
+  /** GET /api/v1/admin/entities/{entity_id}/api-keys - Get API keys for a specific entity. */
+  getEntityApiKeys: async (entityId: string, includeRevoked?: boolean): Promise<EntityApiKey[]> => {
+    const qs = includeRevoked === true ? "?include_revoked=true" : "";
+    const result = await apiRequest<EntityApiKey[] | unknown>(
+      `/api/v1/admin/entities/${encodeURIComponent(entityId)}/api-keys${qs}`,
+      { method: "GET" }
+    );
+    return Array.isArray(result) ? result : [];
+  },
+
+  /** GET /api/v1/admin/api-keys - Get all API keys with pagination and optional filters. */
+  getAllApiKeys: async (params?: {
+    page?: number;
+    page_size?: number;
+    entity_id?: string | null;
+    is_active?: boolean | null;
+  }): Promise<AdminApiKeysListResponse> => {
+    const search = new URLSearchParams();
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    if (params?.entity_id != null && params.entity_id !== "") search.set("entity_id", params.entity_id);
+    if (params?.is_active != null) search.set("is_active", String(params.is_active));
+    const qs = search.toString();
+    return apiRequest<AdminApiKeysListResponse>(
+      `/api/v1/admin/api-keys${qs ? `?${qs}` : ""}`,
+      { method: "GET" }
+    );
+  },
+
+  /** POST /api/v1/admin/api-keys - Create API key. api_key is only returned once! */
+  createApiKey: async (payload: CreateAdminApiKeyPayload): Promise<EntityApiKey> => {
+    return apiRequest<EntityApiKey>("/api/v1/admin/api-keys", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** DELETE /api/v1/admin/api-keys/{api_key_id} - Revoke an API key. */
+  revokeApiKey: async (apiKeyId: string, reason?: string): Promise<EntityApiKey> => {
+    return apiRequest<EntityApiKey>(`/api/v1/admin/api-keys/${encodeURIComponent(apiKeyId)}`, {
+      method: "DELETE",
+      body: JSON.stringify(reason != null && reason !== "" ? { reason } : {}),
+    });
+  },
 };
 
 // --- Submission API (Excel upload) ---
@@ -846,12 +915,19 @@ export async function submitExcelReport(
       typeof body === "object" && body !== null
         ? parseErrorBody(body, response.status, fallback)
         : { code: "SUBMISSION_ERROR", message: response.statusText || fallback };
-    throw new ApiError(
-      response.status === 422 ? "VALIDATION_ERROR" : parsed.code,
-      parsed.message,
-      response.status,
-      body
-    );
+    const statusCode =
+      response.status === 401
+        ? "UNAUTHORIZED"
+        : response.status === 403
+          ? "FORBIDDEN"
+          : response.status === 413
+            ? "FILE_TOO_LARGE"
+            : response.status === 422
+              ? "VALIDATION_ERROR"
+              : response.status === 400
+                ? "BAD_REQUEST"
+                : parsed.code;
+    throw new ApiError(statusCode, parsed.message, response.status, body);
   }
 
   return body as ExcelSubmissionResponse;

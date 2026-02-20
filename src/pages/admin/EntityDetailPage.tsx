@@ -42,9 +42,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { registrationApi, entityApi } from "@/lib/api";
-import type { Entity, UpdateEntityPayload, EntityUser } from "@/lib/api";
-import { FileText, Pencil, Trash2, ArrowLeft, Copy, Users } from "lucide-react";
+import { registrationApi, entityApi, adminApi } from "@/lib/api";
+import type { Entity, UpdateEntityPayload, EntityUser, EntityApiKey } from "@/lib/api";
+import { FileText, Pencil, Trash2, ArrowLeft, Copy, Users, Key, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 const updateSchema = z.object({
@@ -69,6 +69,15 @@ export default function EntityDetailPage() {
   const [deactivateOpen, setDeactivateOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [apiKeys, setApiKeys] = useState<EntityApiKey[]>([]);
+  const [apiKeysLoading, setApiKeysLoading] = useState(false);
+  const [apiKeysError, setApiKeysError] = useState<string | null>(null);
+  const [includeRevokedKeys, setIncludeRevokedKeys] = useState(false);
+  const [createKeyOpen, setCreateKeyOpen] = useState(false);
+  const [createKeySubmitting, setCreateKeySubmitting] = useState(false);
+  const [createdKeyOnce, setCreatedKeyOnce] = useState<EntityApiKey | null>(null);
+  const [revokeKeyTarget, setRevokeKeyTarget] = useState<EntityApiKey | null>(null);
+  const [revokeKeySubmitting, setRevokeKeySubmitting] = useState(false);
 
   const form = useForm<UpdateFormData>({
     resolver: zodResolver(updateSchema),
@@ -128,6 +137,27 @@ export default function EntityDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setApiKeysError(null);
+    setApiKeysLoading(true);
+    adminApi
+      .getEntityApiKeys(id, includeRevokedKeys)
+      .then((keys) => {
+        if (!cancelled) setApiKeys(keys);
+      })
+      .catch(() => {
+        if (!cancelled) setApiKeysError("Failed to load API keys.");
+      })
+      .finally(() => {
+        if (!cancelled) setApiKeysLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, includeRevokedKeys]);
 
   const onEditOpen = () => {
     if (entity) {
@@ -364,9 +394,184 @@ export default function EntityDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            <Card className="mb-6">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="h-5 w-5" />
+                  API keys
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={includeRevokedKeys}
+                      onChange={(e) => setIncludeRevokedKeys(e.target.checked)}
+                      className="rounded border-input"
+                    />
+                    Include revoked
+                  </label>
+                  <Button type="button" size="sm" onClick={() => setCreateKeyOpen(true)} disabled={!entity.is_active}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create API key
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {apiKeysLoading && (
+                  <p className="text-sm text-muted-foreground py-4 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading API keys…
+                  </p>
+                )}
+                {apiKeysError && (
+                  <p className="text-sm text-destructive py-4">{apiKeysError}</p>
+                )}
+                {!apiKeysLoading && !apiKeysError && apiKeys.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-4">No API keys for this entity.</p>
+                )}
+                {!apiKeysLoading && !apiKeysError && apiKeys.length > 0 && (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Key name</TableHead>
+                          <TableHead>Prefix</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead>Last used</TableHead>
+                          <TableHead>Expires</TableHead>
+                          <TableHead className="w-[80px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {apiKeys.map((k) => (
+                          <TableRow key={k.id}>
+                            <TableCell className="font-medium">{k.key_name}</TableCell>
+                            <TableCell className="font-mono text-xs">{k.key_prefix ?? "—"}</TableCell>
+                            <TableCell>
+                              <span className={k.is_active ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                                {k.is_active ? "Active" : "Revoked"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {k.created_at ? new Date(k.created_at).toLocaleDateString() : "—"}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : "—"}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {k.expires_at ? new Date(k.expires_at).toLocaleDateString() : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {k.is_active && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => setRevokeKeyTarget(k)}
+                                >
+                                  Revoke
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
+
+      {/* Create API key modal */}
+      <Dialog
+        open={createKeyOpen}
+        onOpenChange={(open) => {
+          if (!open) setCreatedKeyOnce(null);
+          setCreateKeyOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create API key</DialogTitle>
+            <DialogDescription>
+              Create a new API key for this entity. The key value is shown only once—copy and store it securely.
+            </DialogDescription>
+          </DialogHeader>
+          {createdKeyOnce ? (
+            <CreateKeySuccessContent
+              keyRecord={createdKeyOnce}
+              onDone={() => {
+                setCreatedKeyOnce(null);
+                setCreateKeyOpen(false);
+                adminApi.getEntityApiKeys(id!, includeRevokedKeys).then(setApiKeys).catch(() => {});
+              }}
+            />
+          ) : (
+            <CreateKeyForm
+              entityId={id!}
+              isSubmitting={createKeySubmitting}
+              onSubmit={async (keyName, expiresInDays) => {
+                setCreateKeySubmitting(true);
+                try {
+                  const created = await adminApi.createApiKey({
+                    entity_id: id!,
+                    key_name: keyName,
+                    expires_in_days: expiresInDays || undefined,
+                  });
+                  setCreatedKeyOnce(created);
+                  toast.success("API key created. Copy it now—it won't be shown again.");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Failed to create API key.");
+                } finally {
+                  setCreateKeySubmitting(false);
+                }
+              }}
+              onCancel={() => setCreateKeyOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Revoke API key confirmation */}
+      <AlertDialog open={!!revokeKeyTarget} onOpenChange={(open) => !open && setRevokeKeyTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke API key?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will revoke &quot;{revokeKeyTarget?.key_name}&quot;. The key will no longer work. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revokeKeySubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!revokeKeyTarget) return;
+                setRevokeKeySubmitting(true);
+                try {
+                  await adminApi.revokeApiKey(revokeKeyTarget.id);
+                  toast.success("API key revoked.");
+                  setRevokeKeyTarget(null);
+                  adminApi.getEntityApiKeys(id!, includeRevokedKeys).then(setApiKeys).catch(() => {});
+                } catch {
+                  toast.error("Failed to revoke key.");
+                } finally {
+                  setRevokeKeySubmitting(false);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={revokeKeySubmitting}
+            >
+              {revokeKeySubmitting ? "Revoking…" : "Revoke"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit modal */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -455,5 +660,96 @@ export default function EntityDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
     </MainLayout>
+  );
+}
+
+function CreateKeyForm({
+  entityId,
+  isSubmitting,
+  onSubmit,
+  onCancel,
+}: {
+  entityId: string;
+  isSubmitting: boolean;
+  onSubmit: (keyName: string, expiresInDays: number | undefined) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [keyName, setKeyName] = useState("");
+  const [expiresInDays, setExpiresInDays] = useState<number | "">(90);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!keyName.trim()) return;
+    await onSubmit(keyName.trim(), expiresInDays === "" ? undefined : Number(expiresInDays));
+  };
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="key_name">Key name</Label>
+        <Input
+          id="key_name"
+          value={keyName}
+          onChange={(e) => setKeyName(e.target.value)}
+          placeholder="e.g. Production API"
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="expires_in_days">Expires in (days, optional)</Label>
+        <Input
+          id="expires_in_days"
+          type="number"
+          min={1}
+          value={expiresInDays}
+          onChange={(e) => setExpiresInDays(e.target.value === "" ? "" : parseInt(e.target.value, 10))}
+          placeholder="90"
+        />
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create"}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+function CreateKeySuccessContent({
+  keyRecord,
+  onDone,
+}: {
+  keyRecord: EntityApiKey;
+  onDone: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const keyValue = keyRecord.api_key;
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-3 text-sm">
+        <p className="font-medium text-amber-800 dark:text-amber-200">Save this key now. It won&apos;t be shown again.</p>
+      </div>
+      {keyValue && (
+        <div className="space-y-2">
+          <Label>API key</Label>
+          <div className="flex gap-2">
+            <Input readOnly value={keyValue} className="font-mono text-sm" />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                await navigator.clipboard.writeText(keyValue);
+                setCopied(true);
+                toast.success("Copied to clipboard");
+              }}
+            >
+              {copied ? "Copied" : "Copy"}
+            </Button>
+          </div>
+        </div>
+      )}
+      <DialogFooter>
+        <Button onClick={onDone}>Done</Button>
+      </DialogFooter>
+    </div>
   );
 }

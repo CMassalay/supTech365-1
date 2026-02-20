@@ -184,6 +184,7 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
           items: [
             { title: "User Management", href: "/users", icon: Users },
             { title: "Reporting Entity Management", href: "/entities", icon: Building2 },
+            { title: "API Keys", href: "/admin/api-keys", icon: Key },
             { title: "Register New Entity", href: "/admin/entities/register", icon: UserPlus },
             { title: "Create User", href: "/admin/users/create", icon: UserRoundPlus },
             { title: "Manage Roles", href: "/admin/roles", icon: ShieldCheck },
@@ -250,6 +251,7 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
           items: [
             { title: "User Management", href: "/users", icon: Users },
             { title: "Reporting Entity Management", href: "/entities", icon: Building2 },
+            { title: "API Keys", href: "/admin/api-keys", icon: Key },
             { title: "Register New Entity", href: "/admin/entities/register", icon: UserPlus },
             { title: "Create User", href: "/admin/users/create", icon: UserRoundPlus },
             { title: "Manage Roles", href: "/admin/roles", icon: ShieldCheck },

@@ -27,6 +27,7 @@ import {
 import { registrationApi, ApiError, getValidationErrors, getFriendlyErrorMessage } from "@/lib/api";
 import { validatePassword, generateStrongPassword, type PasswordValidationResult } from "@/lib/password-validation";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const ENTITY_TYPES = ["Bank", "MFI", "FinTech", "Insurance", "Casino", "Other"] as const;
 
@@ -41,6 +42,7 @@ const schema = z
     email: z.string().min(1, "Login email is required").email("Please enter a valid email"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
+    issue_api_credentials: z.boolean().optional().default(false),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -86,6 +88,7 @@ export default function RegisterEntity() {
     resolver: zodResolver(schema),
     defaultValues: {
       entity_type: "Bank",
+      issue_api_credentials: false,
     },
   });
 
@@ -136,6 +139,7 @@ export default function RegisterEntity() {
         username: data.username,
         email: data.email,
         password: data.password,
+        issue_api_credentials: data.issue_api_credentials ?? false,
       });
       setRegistrationData({
         entity: response.entity
@@ -422,6 +426,16 @@ export default function RegisterEntity() {
                   )}
                 </div>
               </div>
+            </div>
+
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox
+                id="issue_api_credentials"
+                {...register("issue_api_credentials")}
+              />
+              <Label htmlFor="issue_api_credentials" className="text-sm font-normal cursor-pointer">
+                Issue API credentials for this entity
+              </Label>
             </div>
 
             <div className="flex gap-4 pt-4">
