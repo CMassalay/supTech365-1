@@ -45,8 +45,8 @@ export default function SubmitReport() {
         e.target.value = "";
         return;
       }
-      if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
-        toast.error("Please select an Excel file (.xlsx or .xls)");
+      if (!file.name.endsWith(".xlsx")) {
+        toast.error("Please select an Excel file (.xlsx, Excel 2007+)");
         e.target.value = "";
         return;
       }
@@ -69,7 +69,7 @@ export default function SubmitReport() {
         toast.error(`File must be under ${MAX_FILE_SIZE_MB}MB`);
         return;
       }
-      if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      if (file.name.endsWith(".xlsx")) {
         setSelectedFile(file);
         setUploadError(null);
       }
@@ -303,12 +303,12 @@ export default function SubmitReport() {
                     <Input
                       id="file-upload"
                       type="file"
-                      accept=".xlsx,.xls"
+                      accept=".xlsx"
                       className="hidden"
                       onChange={handleFileSelect}
                     />
                     <p className="text-xs text-muted-foreground mt-3 sm:mt-4">
-                      Accepted formats: .xlsx (Excel 2007+)<br />
+                      Accepted format: .xlsx (Excel 2007+)<br />
                       Maximum file size: {MAX_FILE_SIZE_MB}MB
                     </p>
                   </div>
