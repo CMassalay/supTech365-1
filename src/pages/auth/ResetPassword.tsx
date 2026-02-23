@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { authApi, ApiError } from "@/lib/api";
+import { authApi, ApiError, getValidationErrors, getFriendlyErrorMessage } from "@/lib/api";
 import { validatePassword, type PasswordValidationResult } from "@/lib/password-validation";
 import { toast } from "sonner";
 
@@ -39,6 +39,8 @@ export default function ResetPassword() {
     register,
     handleSubmit,
     watch,
+    setError: setFormError,
+    clearErrors,
     formState: { errors },
   } = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordSchema),
@@ -107,18 +109,36 @@ export default function ResetPassword() {
     }
 
     setError(null);
+    clearErrors();
     setIsLoading(true);
 
     try {
       await authApi.resetPassword(token, data.newPassword, data.confirmPassword);
       toast.success("Password reset successfully!");
-      
+
       // Redirect to login after 2 seconds
       setTimeout(() => {
         navigate("/login", { state: { message: "Password reset successful. Please log in with your new password." } });
       }, 2000);
     } catch (err) {
       if (err instanceof ApiError) {
+        const details = getValidationErrors(err);
+        const formFieldMap: Record<string, keyof ResetPasswordFormData> = {
+          password: "newPassword",
+          new_password: "newPassword",
+          newPassword: "newPassword",
+          confirm_password: "confirmPassword",
+          confirmPassword: "confirmPassword",
+        };
+        if (details?.length) {
+          details.forEach((e) => {
+            const raw = e.field.replace(/^body\s*->\s*/i, "").trim();
+            const field = formFieldMap[raw] ?? raw;
+            if (field === "newPassword" || field === "confirmPassword") {
+              setFormError(field, { type: "server", message: e.message });
+            }
+          });
+        }
         switch (err.code) {
           case "INVALID_TOKEN":
             setError("Invalid or expired reset token. Please request a new password reset link.");
@@ -130,18 +150,21 @@ export default function ResetPassword() {
             break;
           case "WEAK_PASSWORD":
             setError("Password does not meet requirements. Please check the requirements above.");
+            setFormError("newPassword", { type: "server", message: "Password does not meet all requirements." });
             break;
           case "PASSWORD_MISMATCH":
             setError("Passwords do not match.");
+            setFormError("confirmPassword", { type: "server", message: "Passwords do not match." });
             break;
           case "PASSWORD_REUSE":
             setError("You cannot reuse your last 5 passwords. Please choose a different password.");
+            setFormError("newPassword", { type: "server", message: "Choose a password you haven't used recently." });
             break;
           default:
-            setError(err.message || "An unexpected error occurred. Please try again.");
+            setError(details?.length ? "Please fix the errors below." : getFriendlyErrorMessage(err));
         }
       } else {
-        setError("Connection error. Please try again.");
+        setError("We couldn't reset your password. Please check your connection and try again.");
       }
     } finally {
       setIsLoading(false);

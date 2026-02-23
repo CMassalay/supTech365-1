@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { FileText, Eye, Download, Search, Upload, Filter, X } from "lucide-react";
+import { FileText, Eye, Download, Search, Upload, Filter, X, Loader2, AlertCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { listSubmissions, ApiError } from "@/lib/api";
+import type { SubmissionListItem } from "@/lib/api";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -19,383 +22,105 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CheckCircle2, XCircle, Clock, AlertCircle, Circle } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Circle } from "lucide-react";
 
-interface Submission {
-  id: string;
-  referenceNumber: string;
-  reportType: "CTR" | "STR";
-  submittedDate: string;
-  submittedTime: string;
-  status: "submitted" | "validated" | "under_review" | "rejected" | "returned" | "under_compliance_review" | "under_analysis";
-  currentStage?: string;
-  submissionMethod: "excel" | "api";
+/** Display status key used by getStatusLabel/getStatusIcon (API status is normalized to this). */
+type DisplayStatus =
+  | "submitted"
+  | "validated"
+  | "under_review"
+  | "rejected"
+  | "returned"
+  | "under_compliance_review"
+  | "under_analysis";
+
+/** Normalize API status (e.g. Pending, Under Review, Accepted) to display status key. */
+function normalizeApiStatus(apiStatus: string): DisplayStatus {
+  const s = apiStatus?.toLowerCase().replace(/\s+/g, "_") || "";
+  const map: Record<string, DisplayStatus> = {
+    pending: "submitted",
+    under_review: "under_review",
+    accepted: "validated",
+    rejected: "rejected",
+    requires_clarification: "returned",
+  };
+  return (map[s] ?? "submitted") as DisplayStatus;
 }
 
-const sampleSubmissions: Submission[] = [
-  {
-    id: "1",
-    referenceNumber: "FIA-2026-0234",
-    reportType: "STR",
-    submittedDate: "Jan 20, 2026",
-    submittedTime: "14:32",
-    status: "submitted",
-    currentStage: "Awaiting Validation",
-    submissionMethod: "excel",
-  },
-  {
-    id: "2",
-    referenceNumber: "FIA-2026-0233",
-    reportType: "CTR",
-    submittedDate: "Jan 20, 2026",
-    submittedTime: "09:15",
-    status: "validated",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "api",
-  },
-  {
-    id: "3",
-    referenceNumber: "FIA-2026-0232",
-    reportType: "STR",
-    submittedDate: "Jan 19, 2026",
-    submittedTime: "16:45",
-    status: "validated",
-    currentStage: "Under Analysis",
-    submissionMethod: "excel",
-  },
-  {
-    id: "4",
-    referenceNumber: "FIA-2026-0231",
-    reportType: "CTR",
-    submittedDate: "Jan 19, 2026",
-    submittedTime: "11:20",
-    status: "returned",
-    currentStage: "Correction Required",
-    submissionMethod: "excel",
-  },
-  {
-    id: "5",
-    referenceNumber: "FIA-2026-0230",
-    reportType: "STR",
-    submittedDate: "Jan 18, 2026",
-    submittedTime: "14:10",
-    status: "rejected",
-    currentStage: "See details for reason",
-    submissionMethod: "excel",
-  },
-  {
-    id: "6",
-    referenceNumber: "FIA-2026-0229",
-    reportType: "CTR",
-    submittedDate: "Jan 18, 2026",
-    submittedTime: "10:30",
-    status: "validated",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "api",
-  },
-  {
-    id: "7",
-    referenceNumber: "FIA-2026-0228",
-    reportType: "STR",
-    submittedDate: "Jan 17, 2026",
-    submittedTime: "15:20",
-    status: "returned",
-    currentStage: "Correction Required",
-    submissionMethod: "excel",
-  },
-  {
-    id: "8",
-    referenceNumber: "FIA-2026-0227",
-    reportType: "CTR",
-    submittedDate: "Jan 17, 2026",
-    submittedTime: "09:45",
-    status: "validated",
-    currentStage: "Under Analysis",
-    submissionMethod: "api",
-  },
-  {
-    id: "9",
-    referenceNumber: "FIA-2026-0226",
-    reportType: "STR",
-    submittedDate: "Jan 16, 2026",
-    submittedTime: "13:15",
-    status: "submitted",
-    currentStage: "Awaiting Validation",
-    submissionMethod: "excel",
-  },
-  {
-    id: "10",
-    referenceNumber: "FIA-2026-0225",
-    reportType: "CTR",
-    submittedDate: "Jan 16, 2026",
-    submittedTime: "08:00",
-    status: "validated",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "api",
-  },
-  {
-    id: "11",
-    referenceNumber: "FIA-2026-0224",
-    reportType: "STR",
-    submittedDate: "Jan 15, 2026",
-    submittedTime: "16:30",
-    status: "under_review",
-    currentStage: "Under Review",
-    submissionMethod: "excel",
-  },
-  {
-    id: "12",
-    referenceNumber: "FIA-2026-0223",
-    reportType: "CTR",
-    submittedDate: "Jan 15, 2026",
-    submittedTime: "11:20",
-    status: "validated",
-    currentStage: "Under Analysis",
-    submissionMethod: "api",
-  },
-  {
-    id: "13",
-    referenceNumber: "FIA-2026-0222",
-    reportType: "STR",
-    submittedDate: "Jan 14, 2026",
-    submittedTime: "14:45",
-    status: "submitted",
-    currentStage: "Awaiting Validation",
-    submissionMethod: "excel",
-  },
-  {
-    id: "14",
-    referenceNumber: "FIA-2026-0221",
-    reportType: "CTR",
-    submittedDate: "Jan 14, 2026",
-    submittedTime: "10:15",
-    status: "validated",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "api",
-  },
-  {
-    id: "15",
-    referenceNumber: "FIA-2026-0220",
-    reportType: "STR",
-    submittedDate: "Jan 13, 2026",
-    submittedTime: "15:30",
-    status: "under_analysis",
-    currentStage: "Under Analysis",
-    submissionMethod: "excel",
-  },
-  {
-    id: "16",
-    referenceNumber: "FIA-2026-0219",
-    reportType: "CTR",
-    submittedDate: "Jan 13, 2026",
-    submittedTime: "09:00",
-    status: "validated",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "api",
-  },
-  {
-    id: "17",
-    referenceNumber: "FIA-2026-0218",
-    reportType: "STR",
-    submittedDate: "Jan 12, 2026",
-    submittedTime: "13:20",
-    status: "rejected",
-    currentStage: "See details for reason",
-    submissionMethod: "excel",
-  },
-  {
-    id: "18",
-    referenceNumber: "FIA-2026-0217",
-    reportType: "CTR",
-    submittedDate: "Jan 12, 2026",
-    submittedTime: "08:45",
-    status: "validated",
-    currentStage: "Under Analysis",
-    submissionMethod: "api",
-  },
-  {
-    id: "19",
-    referenceNumber: "FIA-2026-0216",
-    reportType: "STR",
-    submittedDate: "Jan 11, 2026",
-    submittedTime: "16:10",
-    status: "submitted",
-    currentStage: "Awaiting Validation",
-    submissionMethod: "excel",
-  },
-  {
-    id: "20",
-    referenceNumber: "FIA-2026-0215",
-    reportType: "CTR",
-    submittedDate: "Jan 11, 2026",
-    submittedTime: "10:30",
-    status: "under_compliance_review",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "api",
-  },
-  {
-    id: "21",
-    referenceNumber: "FIA-2026-0214",
-    reportType: "STR",
-    submittedDate: "Jan 10, 2026",
-    submittedTime: "14:00",
-    status: "validated",
-    currentStage: "Under Analysis",
-    submissionMethod: "excel",
-  },
-  {
-    id: "22",
-    referenceNumber: "FIA-2026-0213",
-    reportType: "CTR",
-    submittedDate: "Jan 10, 2026",
-    submittedTime: "09:20",
-    status: "validated",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "api",
-  },
-  {
-    id: "23",
-    referenceNumber: "FIA-2026-0212",
-    reportType: "STR",
-    submittedDate: "Jan 9, 2026",
-    submittedTime: "15:45",
-    status: "returned",
-    currentStage: "Correction Required",
-    submissionMethod: "excel",
-  },
-  {
-    id: "24",
-    referenceNumber: "FIA-2026-0211",
-    reportType: "CTR",
-    submittedDate: "Jan 9, 2026",
-    submittedTime: "11:10",
-    status: "validated",
-    currentStage: "Under Analysis",
-    submissionMethod: "api",
-  },
-  {
-    id: "25",
-    referenceNumber: "FIA-2026-0210",
-    reportType: "STR",
-    submittedDate: "Jan 8, 2026",
-    submittedTime: "13:30",
-    status: "submitted",
-    currentStage: "Awaiting Validation",
-    submissionMethod: "excel",
-  },
-  {
-    id: "26",
-    referenceNumber: "FIA-2026-0209",
-    reportType: "CTR",
-    submittedDate: "Jan 8, 2026",
-    submittedTime: "08:15",
-    status: "validated",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "api",
-  },
-  {
-    id: "27",
-    referenceNumber: "FIA-2026-0208",
-    reportType: "STR",
-    submittedDate: "Jan 7, 2026",
-    submittedTime: "16:20",
-    status: "under_review",
-    currentStage: "Under Review",
-    submissionMethod: "excel",
-  },
-  {
-    id: "28",
-    referenceNumber: "FIA-2026-0207",
-    reportType: "CTR",
-    submittedDate: "Jan 7, 2026",
-    submittedTime: "10:45",
-    status: "validated",
-    currentStage: "Under Analysis",
-    submissionMethod: "api",
-  },
-  {
-    id: "29",
-    referenceNumber: "FIA-2026-0206",
-    reportType: "STR",
-    submittedDate: "Jan 6, 2026",
-    submittedTime: "14:15",
-    status: "validated",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "excel",
-  },
-  {
-    id: "30",
-    referenceNumber: "FIA-2026-0205",
-    reportType: "CTR",
-    submittedDate: "Jan 6, 2026",
-    submittedTime: "09:30",
-    status: "rejected",
-    currentStage: "See details for reason",
-    submissionMethod: "api",
-  },
-  {
-    id: "31",
-    referenceNumber: "FIA-2026-0204",
-    reportType: "STR",
-    submittedDate: "Jan 5, 2026",
-    submittedTime: "15:00",
-    status: "validated",
-    currentStage: "Under Analysis",
-    submissionMethod: "excel",
-  },
-  {
-    id: "32",
-    referenceNumber: "FIA-2026-0203",
-    reportType: "CTR",
-    submittedDate: "Jan 5, 2026",
-    submittedTime: "11:20",
-    status: "submitted",
-    currentStage: "Awaiting Validation",
-    submissionMethod: "api",
-  },
-  {
-    id: "33",
-    referenceNumber: "FIA-2026-0202",
-    reportType: "STR",
-    submittedDate: "Jan 4, 2026",
-    submittedTime: "13:45",
-    status: "validated",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "excel",
-  },
-  {
-    id: "34",
-    referenceNumber: "FIA-2026-0201",
-    reportType: "CTR",
-    submittedDate: "Jan 4, 2026",
-    submittedTime: "08:00",
-    status: "returned",
-    currentStage: "Correction Required",
-    submissionMethod: "api",
-  },
-  {
-    id: "35",
-    referenceNumber: "FIA-2026-0200",
-    reportType: "STR",
-    submittedDate: "Jan 3, 2026",
-    submittedTime: "16:30",
-    status: "validated",
-    currentStage: "Under Analysis",
-    submissionMethod: "excel",
-  },
-  {
-    id: "36",
-    referenceNumber: "FIA-2025-0199",
-    reportType: "CTR",
-    submittedDate: "Dec 31, 2025",
-    submittedTime: "10:15",
-    status: "validated",
-    currentStage: "Under Compliance Review",
-    submissionMethod: "api",
-  },
-];
+/** Build start_date/end_date (YYYY-MM-DD) from date range filter. */
+function getDateRangeParams(range: string): { start_date?: string; end_date?: string } {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const toISO = (d: Date) => d.toISOString().slice(0, 10);
+  switch (range) {
+    case "today":
+      return { start_date: toISO(today), end_date: toISO(today) };
+    case "7days": {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 6);
+      return { start_date: toISO(start), end_date: toISO(today) };
+    }
+    case "30days": {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 29);
+      return { start_date: toISO(start), end_date: toISO(today) };
+    }
+    case "thismonth":
+      return {
+        start_date: toISO(new Date(now.getFullYear(), now.getMonth(), 1)),
+        end_date: toISO(today),
+      };
+    case "lastmonth": {
+      const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const m = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+      return {
+        start_date: toISO(new Date(y, m, 1)),
+        end_date: toISO(new Date(y, m + 1, 0)),
+      };
+    }
+    default:
+      return {};
+  }
+}
 
-const getStatusIcon = (status: Submission["status"]) => {
+/** Format submitted_at ISO string to "Jan 20, 2026" and "14:32". */
+function formatSubmittedAt(iso: string): { date: string; time: string } {
+  try {
+    const d = new Date(iso);
+    const date = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return { date, time };
+  } catch {
+    return { date: iso.slice(0, 10), time: "" };
+  }
+}
+
+/** Table row shape derived from API SubmissionListItem. */
+interface SubmissionRow {
+  id: string;
+  referenceNumber: string;
+  reportType: "STR" | "CTR";
+  submittedDate: string;
+  submittedTime: string;
+  status: DisplayStatus;
+  currentStage?: string;
+}
+
+function mapApiItemToRow(item: SubmissionListItem): SubmissionRow {
+  const { date, time } = formatSubmittedAt(item.submitted_at);
+  return {
+    id: item.reference,
+    referenceNumber: item.reference,
+    reportType: item.report_type === "STR" || item.report_type === "CTR" ? item.report_type : "STR",
+    submittedDate: date,
+    submittedTime: time,
+    status: normalizeApiStatus(item.status),
+    currentStage: item.status,
+  };
+}
+
+
+const getStatusIcon = (status: DisplayStatus) => {
   switch (status) {
     case "submitted":
       return <Circle className="h-4 w-4 text-blue-600" />;
@@ -411,7 +136,7 @@ const getStatusIcon = (status: Submission["status"]) => {
 };
 
 // Shortened labels for display
-const getStatusLabel = (status: Submission["status"]) => {
+const getStatusLabel = (status: DisplayStatus) => {
   switch (status) {
     case "submitted":
       return "Submitted";
@@ -433,7 +158,7 @@ const getStatusLabel = (status: Submission["status"]) => {
 };
 
 // Full descriptions for tooltips
-const getStatusTooltip = (status: Submission["status"]) => {
+const getStatusTooltip = (status: DisplayStatus) => {
   switch (status) {
     case "submitted":
       return "Submitted";
@@ -469,6 +194,21 @@ const getStageTooltip = (stage?: string) => {
   return stage || "";
 };
 
+/** Map our filter value to API status param (backend: Pending, Under Review, Accepted, Rejected, Requires Clarification). */
+function filterStatusToApi(statusFilter: string): string | undefined {
+  if (statusFilter === "all") return undefined;
+  const map: Record<string, string> = {
+    submitted: "Pending",
+    validated: "Accepted",
+    rejected: "Rejected",
+    returned: "Requires Clarification",
+    under_review: "Under Review",
+    under_compliance_review: "Under Review",
+    under_analysis: "Under Review",
+  };
+  return map[statusFilter] ?? undefined;
+}
+
 export default function MySubmissions() {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -477,31 +217,82 @@ export default function MySubmissions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
+  const [listData, setListData] = useState<{
+    submissions: SubmissionRow[];
+    total: number;
+    page: number;
+    totalPages: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchSubmissions = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const dateParams = getDateRangeParams(dateRangeFilter);
+      const res = await listSubmissions({
+        status: filterStatusToApi(statusFilter),
+        report_type: typeFilter === "all" ? undefined : typeFilter,
+        start_date: dateParams.start_date,
+        end_date: dateParams.end_date,
+        search: searchQuery.trim() || undefined,
+        page: currentPage,
+        limit: itemsPerPage,
+      });
+      const totalPages = res.total_pages ?? (Math.ceil((res.total || 0) / itemsPerPage) || 1);
+      setListData({
+        submissions: (res.submissions || []).map(mapApiItemToRow),
+        total: res.total ?? 0,
+        page: res.page ?? currentPage,
+        totalPages,
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Failed to load submissions.";
+      setError(message);
+      toast.error(message);
+      setListData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, typeFilter, dateRangeFilter, searchQuery, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    fetchSubmissions();
+  }, [fetchSubmissions]);
 
   const breadcrumbItems = [
     { label: "Reporting Entity Workspace", icon: <FileText className="h-5 w-5" /> },
     { label: "My Submissions" },
   ];
 
-  const filteredSubmissions = sampleSubmissions.filter((submission) => {
-    if (statusFilter !== "all" && submission.status !== statusFilter) return false;
-    if (typeFilter !== "all" && submission.reportType !== typeFilter) return false;
-    if (searchQuery && !submission.referenceNumber.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
-
-  const totalPages = Math.ceil(filteredSubmissions.length / itemsPerPage);
+  const paginatedSubmissions = listData?.submissions ?? [];
+  const totalPages = listData?.totalPages ?? 0;
+  const total = listData?.total ?? 0;
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedSubmissions = filteredSubmissions.slice(startIndex, startIndex + itemsPerPage);
 
   const clearFilters = () => {
     setStatusFilter("all");
     setTypeFilter("all");
     setDateRangeFilter("all");
     setSearchQuery("");
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = statusFilter !== "all" || typeFilter !== "all" || dateRangeFilter !== "all" || searchQuery !== "";
+
+  const setStatusFilterAndResetPage = (v: string) => {
+    setStatusFilter(v);
+    setCurrentPage(1);
+  };
+  const setTypeFilterAndResetPage = (v: string) => {
+    setTypeFilter(v);
+    setCurrentPage(1);
+  };
+  const setDateRangeFilterAndResetPage = (v: string) => {
+    setDateRangeFilter(v);
+    setCurrentPage(1);
+  };
 
   return (
     <MainLayout>
@@ -524,7 +315,7 @@ export default function MySubmissions() {
           <CardContent className="p-4">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex flex-wrap gap-2 flex-1">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter} onValueChange={setStatusFilterAndResetPage}>
                   <SelectTrigger className="w-[150px]">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Status" />
@@ -552,7 +343,7 @@ export default function MySubmissions() {
                   </SelectContent>
                 </Select>
 
-                <Select value={dateRangeFilter} onValueChange={setDateRangeFilter}>
+                <Select value={dateRangeFilter} onValueChange={setDateRangeFilterAndResetPage}>
                   <SelectTrigger className="w-[150px]">
                     <SelectValue placeholder="Date Range" />
                   </SelectTrigger>
@@ -593,7 +384,7 @@ export default function MySubmissions() {
         {/* Results Info and Actions */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredSubmissions.length)} of {filteredSubmissions.length} submissions
+            Showing {loading ? "..." : `${startIndex + 1}-${startIndex + paginatedSubmissions.length} of ${total}`} submissions
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm">
@@ -602,6 +393,17 @@ export default function MySubmissions() {
             </Button>
           </div>
         </div>
+
+        {/* Error */}
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+            <Button variant="ghost" size="sm" onClick={() => fetchSubmissions()}>
+              Retry
+            </Button>
+          </div>
+        )}
 
         {/* Table */}
         <Card>
@@ -616,7 +418,16 @@ export default function MySubmissions() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedSubmissions.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-12">
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Loading submissions...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : paginatedSubmissions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     No submissions found
@@ -689,7 +500,7 @@ export default function MySubmissions() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => navigate(`/submissions/${submission.id}`)}
+                          onClick={() => navigate(`/submissions/${submission.referenceNumber}`)}
                         >
                           <Eye className="h-4 w-4 mr-1" />
                           View

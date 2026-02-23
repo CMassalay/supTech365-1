@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { authApi, ApiError } from "@/lib/api";
+import { authApi, ApiError, getValidationErrors, getFriendlyErrorMessage } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { validateEmail, validateUsername } from "@/lib/password-validation";
-import { mapBackendRole } from "@/types/roles";
+import { mapBackendRole, type UserRole } from "@/types/roles";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
@@ -22,6 +22,25 @@ const loginSchema = z.object({
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
+
+/** Only use returnUrl if it belongs to the logged-in role's workspace (avoids sending e.g. reporting entity to /compliance/dashboards). */
+function isReturnUrlAllowedForRole(returnUrl: string, role: UserRole): boolean {
+  const path = returnUrl.split("?")[0];
+  if (role === "reporting_entity") {
+    const allowed = ["/", "/submit", "/submissions", "/resubmissions", "/statistics", "/my-entity", "/api-credentials"];
+    return allowed.some((p) => path === p || (p !== "/" && path.startsWith(p + "/")));
+  }
+  if (role === "compliance_officer" || role === "head_of_compliance") {
+    return path === "/" || path.startsWith("/compliance");
+  }
+  if (role === "analyst" || role === "head_of_analysis") {
+    return path === "/" || path.startsWith("/analysis") || path.startsWith("/my-assignments") || path.startsWith("/subjects");
+  }
+  if (role === "tech_admin" || role === "super_admin") {
+    return true;
+  }
+  return path === "/" || path.startsWith("/");
+}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -36,6 +55,8 @@ export default function Login() {
   const {
     register,
     handleSubmit,
+    setError: setFormError,
+    clearErrors,
     formState: { errors },
     setFocus,
   } = useForm<LoginFormData>({
@@ -71,6 +92,7 @@ export default function Login() {
 
   const onSubmit = async (data: LoginFormData) => {
     setError(null);
+    clearErrors();
     setIsLoading(true);
 
     try {
@@ -104,56 +126,69 @@ export default function Login() {
       }
       toast.success(`Welcome back, ${response.user.username}!`);
 
+      const role = mapBackendRole(response.user.role);
+      const roleRoutes: Record<string, string> = {
+        reporting_entity: "/submissions",
+        compliance_officer: "/compliance/validation",
+        head_of_compliance: "/compliance/dashboards/processing",
+        analyst: "/analysis-queue",
+        head_of_analysis: "/analysis-queue",
+        director_ops: "/",
+        oic: "/",
+        tech_admin: "/",
+        super_admin: "/",
+      };
+      const defaultRoute = roleRoutes[role] ?? "/";
+
       const returnUrl = searchParams.get("returnUrl");
-      if (returnUrl && returnUrl.startsWith("/")) {
+      if (returnUrl && returnUrl.startsWith("/") && isReturnUrlAllowedForRole(returnUrl, role)) {
         navigate(returnUrl);
       } else {
-        const role = mapBackendRole(response.user.role);
-        const roleRoutes: Record<string, string> = {
-          reporting_entity: "/submissions",
-          compliance_officer: "/compliance/validation/assigned",
-          head_of_compliance: "/compliance/dashboards",
-          analyst: "/analysis/queue/assigned",
-          head_of_analysis: "/analysis/dashboards",
-          director_ops: "/audit/dashboards/director-ops",
-          oic: "/audit/dashboards/oic",
-          tech_admin: "/",
-          super_admin: "/",
-        };
-        navigate(roleRoutes[role] || "/");
+        navigate(defaultRoute);
       }
     } catch (err) {
       if (err instanceof ApiError) {
+        const details = getValidationErrors(err);
+        if (details?.length) {
+          details.forEach((e) => {
+            const field = e.field.replace(/^body\s*->\s*/i, "").trim().replace(/-/g, "");
+            if (field === "username" || field === "password") {
+              setFormError(field as "username" | "password", { type: "server", message: e.message });
+            }
+          });
+        }
         switch (err.code) {
           case "INVALID_CREDENTIALS":
             setError("Invalid username or password. Please try again.");
             break;
-          case "ACCOUNT_LOCKED":
+          case "ACCOUNT_LOCKED": {
             const lockoutTime = err.data?.lockoutExpiresAt
-              ? new Date(err.data.lockoutExpiresAt)
+              ? new Date((err.data as { lockoutExpiresAt?: string }).lockoutExpiresAt)
               : null;
-            const minutes = err.data?.remainingMinutes || null;
+            const minutes = (err.data as { remainingMinutes?: number })?.remainingMinutes ?? null;
             setLockoutExpiresAt(lockoutTime);
             setRemainingMinutes(minutes);
             setError(
               `Account locked due to multiple failed login attempts. Please try again in ${minutes} minutes.`
             );
             break;
+          }
           case "ACCOUNT_DISABLED":
             setError("Your account has been disabled. Please contact support at support@fia.gov.lr");
             break;
-          case "RATE_LIMIT_EXCEEDED":
-            const retryAfter = err.data?.retryAfter || 60;
+          case "RATE_LIMIT_EXCEEDED": {
+            const retryAfter = (err.data as { retryAfter?: number })?.retryAfter ?? 60;
             setError(`Too many login attempts. Please try again in ${retryAfter} seconds.`);
             break;
+          }
           case "SESSION_EXPIRED":
             setError("Your session has expired. Please log in again.");
             break;
           default:
-            setError(err.message || "An unexpected error occurred. Please try again.");
+            setError(details?.length ? "Please fix the errors below." : getFriendlyErrorMessage(err));
         }
       } else {
-        setError("Connection error. Please check your internet connection and try again.");
+        setError("We couldn't sign you in. Please check your connection and try again.");
       }
     } finally {
       setIsLoading(false);

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { authApi, ApiError } from "@/lib/api";
+import { authApi, ApiError, getValidationErrors, getFriendlyErrorMessage } from "@/lib/api";
 import { validateEmail } from "@/lib/password-validation";
 import { toast } from "sonner";
 
@@ -28,6 +28,8 @@ export default function ForgotPassword() {
   const {
     register,
     handleSubmit,
+    setError: setFormError,
+    clearErrors,
     formState: { errors },
     getValues,
     setFocus,
@@ -58,11 +60,13 @@ export default function ForgotPassword() {
 
   const onSubmit = async (data: ForgotPasswordFormData) => {
     setError(null);
+    clearErrors();
     setIsLoading(true);
 
     try {
       if (!validateEmail(data.email)) {
         setError("Please enter a valid email address");
+        setFormError("email", { type: "manual", message: "Please enter a valid email address" });
         setIsLoading(false);
         return;
       }
@@ -73,20 +77,31 @@ export default function ForgotPassword() {
       toast.success("Password reset link sent!");
     } catch (err) {
       if (err instanceof ApiError) {
+        const details = getValidationErrors(err);
+        if (details?.length) {
+          details.forEach((e) => {
+            const field = e.field.replace(/^body\s*->\s*/i, "").trim();
+            if (field === "email") {
+              setFormError("email", { type: "server", message: e.message });
+            }
+          });
+        }
         switch (err.code) {
           case "INVALID_EMAIL":
             setError("Please enter a valid email address");
+            setFormError("email", { type: "server", message: "Please enter a valid email address" });
             break;
-          case "RATE_LIMIT_EXCEEDED":
-            const retryAfter = err.data?.retryAfter || 60;
+          case "RATE_LIMIT_EXCEEDED": {
+            const retryAfter = (err.data as { retryAfter?: number })?.retryAfter ?? 60;
             setResendCooldown(retryAfter);
             setError(`Too many requests. Please try again in ${retryAfter} seconds.`);
             break;
+          }
           default:
-            setError(err.message || "An unexpected error occurred. Please try again.");
+            setError(details?.length ? "Please fix the error below." : getFriendlyErrorMessage(err));
         }
       } else {
-        setError("Connection error. Please try again.");
+        setError("We couldn't send the reset link. Please check your connection and try again.");
       }
     } finally {
       setIsLoading(false);
@@ -110,12 +125,16 @@ export default function ForgotPassword() {
       setResendCooldown(60);
       toast.success("Password reset link sent!");
     } catch (err) {
-      if (err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED") {
-        const retryAfter = err.data?.retryAfter || 60;
-        setResendCooldown(retryAfter);
-        setError(`Too many requests. Please try again in ${retryAfter} seconds.`);
+      if (err instanceof ApiError) {
+        if (err.code === "RATE_LIMIT_EXCEEDED") {
+          const retryAfter = (err.data as { retryAfter?: number })?.retryAfter ?? 60;
+          setResendCooldown(retryAfter);
+          setError(`Too many requests. Please try again in ${retryAfter} seconds.`);
+        } else {
+          setError(getFriendlyErrorMessage(err));
+        }
       } else {
-        setError("Connection error. Please try again.");
+        setError("We couldn't send the reset link. Please check your connection and try again.");
       }
     } finally {
       setIsLoading(false);

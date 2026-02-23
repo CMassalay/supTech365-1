@@ -38,6 +38,7 @@ interface PasswordChangeModalProps {
 }
 
 export function PasswordChangeModal({ open, onSuccess }: PasswordChangeModalProps) {
+  const { clearPasswordChangeRequired } = useAuth();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);

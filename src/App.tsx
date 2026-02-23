@@ -61,6 +61,7 @@ import MyAssignmentsPage from "./pages/my-assignments/MyAssignmentsPage";
 import NotificationsPage from "./pages/notifications/NotificationsPage";
 import EntitiesPage from "./pages/admin/EntitiesPage";
 import EntityDetailPage from "./pages/admin/EntityDetailPage";
+import AdminApiKeysPage from "./pages/admin/AdminApiKeysPage";
 import SessionsPage from "./pages/admin/SessionsPage";
 import ProfilePage from "./pages/profile/ProfilePage";
 import SubjectSearchPage from "./pages/subjects/SubjectSearchPage";
@@ -159,6 +160,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRole={["tech_admin", "super_admin"]}>
                     <EntityDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/api-keys"
+                element={
+                  <ProtectedRoute requiredRole={["tech_admin", "super_admin"]}>
+                    <AdminApiKeysPage />
                   </ProtectedRoute>
                 }
               />

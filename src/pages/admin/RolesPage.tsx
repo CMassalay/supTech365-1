@@ -30,8 +30,8 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { adminApi, ApiError, getValidationErrors } from "@/lib/api";
-import type { Role } from "@/lib/api";
-import { Shield, Plus, Pencil, Trash2, UserPlus, RefreshCw, Loader2, AlertCircle } from "lucide-react";
+import type { Role, BulkAssignRoleResponse } from "@/lib/api";
+import { Shield, Plus, Pencil, Trash2, UserPlus, Users, RefreshCw, Loader2, AlertCircle, CheckCircle2, XCircle, X } from "lucide-react";
 import { toast } from "sonner";
 
 export default function RolesPage() {
@@ -45,6 +45,7 @@ export default function RolesPage() {
   const [editRole, setEditRole] = useState<Role | null>(null);
   const [deleteRole, setDeleteRole] = useState<Role | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [availablePermissions, setAvailablePermissions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<{ field: string; message: string }[]>([]);
@@ -99,6 +100,10 @@ export default function RolesPage() {
             <Button variant="outline" size="sm" onClick={() => setAssignOpen(true)}>
               <UserPlus className="h-4 w-4 mr-2" />
               Assign Role to User
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setBulkAssignOpen(true)}>
+              <Users className="h-4 w-4 mr-2" />
+              Bulk Assign Role
             </Button>
           </div>
         </div>
@@ -219,6 +224,16 @@ export default function RolesPage() {
         roles={roles}
         onSuccess={() => {
           setAssignOpen(false);
+          loadRoles();
+        }}
+      />
+
+      <BulkAssignRoleModal
+        open={bulkAssignOpen}
+        onOpenChange={setBulkAssignOpen}
+        roles={roles}
+        onSuccess={() => {
+          setBulkAssignOpen(false);
           loadRoles();
         }}
       />
@@ -588,10 +603,10 @@ function AssignRoleModal({
           <div className="space-y-2">
             <Label>Role</Label>
             <Select value={roleName} onValueChange={setRoleName}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 w-full max-w-[200px]">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-48 overflow-y-auto min-w-[12rem]">
                 {roles.map((r) => (
                   <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
                 ))}
@@ -605,6 +620,299 @@ function AssignRoleModal({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function parsePastedIds(text: string): string[] {
+  return text
+    .split(/[\n,\s]+/)
+    .map((s) => s.trim())
+    .filter((s) => UUID_REGEX.test(s));
+}
+
+function BulkAssignRoleModal({
+  open,
+  onOpenChange,
+  roles,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  roles: Role[];
+  onSuccess: () => void;
+}) {
+  const [userIds, setUserIds] = useState<string[]>([]);
+  const [currentInput, setCurrentInput] = useState("");
+  const [roleName, setRoleName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<{ field: string; message: string }[]>([]);
+  const [result, setResult] = useState<BulkAssignRoleResponse | null>(null);
+
+  const addOne = (id: string) => {
+    const trimmed = id.trim();
+    if (!UUID_REGEX.test(trimmed)) return;
+    setUserIds((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+    setCurrentInput("");
+  };
+
+  const addMany = (ids: string[]) => {
+    const valid = ids.filter((id) => UUID_REGEX.test(id));
+    setUserIds((prev) => {
+      const set = new Set([...prev, ...valid]);
+      return Array.from(set);
+    });
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = parsePastedIds(text);
+      if (parsed.length) {
+        addMany(parsed);
+        toast.success(`Added ${parsed.length} user ID${parsed.length !== 1 ? "s" : ""}`);
+      } else {
+        toast.error("No valid UUIDs found in clipboard.");
+      }
+    } catch {
+      toast.error("Could not read clipboard.");
+    }
+  };
+
+  const removeId = (id: string) => {
+    setUserIds((prev) => prev.filter((x) => x !== id));
+  };
+
+  const clearAll = () => {
+    setUserIds([]);
+    setCurrentInput("");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setValidationErrors([]);
+    setResult(null);
+    if (!userIds.length || !roleName) {
+      setError("Add at least one user ID and select a role.");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await adminApi.bulkAssignRole({ user_ids: userIds, role_name: roleName });
+      setResult(res);
+      toast.success(res.message || `Bulk assign complete: ${res.successful_assignments} succeeded, ${res.failed_assignments} failed.`);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message || "Bulk assign failed.");
+        setValidationErrors(getValidationErrors(err) ?? []);
+      } else {
+        setError("Request failed.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClose = (open: boolean) => {
+    if (!open) {
+      setUserIds([]);
+      setCurrentInput("");
+      setRoleName("");
+      setError(null);
+      setValidationErrors([]);
+      setResult(null);
+    }
+    onOpenChange(open);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader>
+          <DialogTitle>Bulk Assign Role</DialogTitle>
+          <DialogDescription>
+            Add user IDs one by one or paste from clipboard. Each ID appears as a chip—remove any before submitting.
+          </DialogDescription>
+        </DialogHeader>
+        {result ? (
+          <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+              <div className="rounded-md bg-muted p-3">
+                <p className="text-muted-foreground">Total</p>
+                <p className="font-semibold">{result.total_users}</p>
+              </div>
+              <div className="rounded-md bg-green-500/10 p-3">
+                <p className="text-muted-foreground">Succeeded</p>
+                <p className="font-semibold text-green-700 dark:text-green-400">{result.successful_assignments}</p>
+              </div>
+              <div className="rounded-md bg-destructive/10 p-3">
+                <p className="text-muted-foreground">Failed</p>
+                <p className="font-semibold text-destructive">{result.failed_assignments}</p>
+              </div>
+              <div className="rounded-md bg-muted p-3">
+                <p className="text-muted-foreground">Role</p>
+                <p className="font-semibold">{result.role_name}</p>
+              </div>
+            </div>
+            {result.results?.length > 0 && (
+              <div className="rounded-md border overflow-x-auto max-h-64 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Old role</TableHead>
+                      <TableHead>New role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Message</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {result.results.map((r, i) => (
+                      <TableRow key={r.user_id + String(i)}>
+                        <TableCell className="font-mono text-xs">{r.username ?? r.user_id}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{r.old_role}</TableCell>
+                        <TableCell className="text-sm">{r.new_role}</TableCell>
+                        <TableCell>
+                          {r.success ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={r.message}>{r.message}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setResult(null); }}>
+                Assign again
+              </Button>
+              <Button onClick={() => { onSuccess(); handleClose(false); }}>
+                Done
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex flex-col min-h-0">
+            {error && (
+              <Alert variant="destructive" className="shrink-0">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {error}
+                  {validationErrors.length > 0 && (
+                    <ul className="list-disc list-inside mt-2 text-sm">
+                      {validationErrors.map((e, i) => (
+                        <li key={i}>{e.field}: {e.message}</li>
+                      ))}
+                    </ul>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2 shrink-0">
+              <Label>Add user IDs</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={currentInput}
+                  onChange={(e) => setCurrentInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addOne(currentInput);
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData("text");
+                    const parsed = parsePastedIds(pasted);
+                    if (parsed.length > 1) {
+                      e.preventDefault();
+                      addMany(parsed);
+                      toast.success(`Added ${parsed.length} user IDs`);
+                    }
+                  }}
+                  placeholder="Paste or type a UUID, press Enter to add"
+                  className="font-mono text-sm flex-1"
+                />
+                <Button type="button" variant="secondary" onClick={() => addOne(currentInput)}>
+                  Add
+                </Button>
+                <Button type="button" variant="outline" onClick={handlePasteFromClipboard}>
+                  Paste from clipboard
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Paste multiple at once (newlines or commas) to add all valid UUIDs.
+              </p>
+            </div>
+
+            <div className="space-y-2 flex-1 min-h-0 flex flex-col">
+              <div className="flex items-center justify-between">
+                <Label>User IDs to assign ({userIds.length})</Label>
+                {userIds.length > 0 && (
+                  <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" onClick={clearAll}>
+                    Clear all
+                  </Button>
+                )}
+              </div>
+              <div className="rounded-md border bg-muted/30 p-3 min-h-[120px] max-h-48 overflow-y-auto">
+                {userIds.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">No user IDs added yet. Add one above or paste from clipboard.</p>
+                ) : (
+                  <ul className="flex flex-wrap gap-2">
+                    {userIds.map((id) => (
+                      <li key={id}>
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-md bg-background border px-2.5 py-1 text-xs font-mono shadow-sm"
+                          title={id}
+                        >
+                          <span className="max-w-[140px] truncate">{id}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeId(id)}
+                            className="rounded p-0.5 hover:bg-muted text-muted-foreground hover:text-foreground"
+                            aria-label="Remove"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2 shrink-0">
+              <Label>Role</Label>
+              <Select value={roleName} onValueChange={setRoleName}>
+                <SelectTrigger className="h-8 w-full max-w-[200px]">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent className="max-h-48 overflow-y-auto min-w-[12rem]">
+                  {roles.map((r) => (
+                    <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter className="shrink-0">
+              <Button type="button" variant="outline" onClick={() => handleClose(false)}>Cancel</Button>
+              <Button type="submit" disabled={isLoading || userIds.length === 0}>
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Bulk assign"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

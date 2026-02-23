@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { registrationApi, adminApi, ApiError, getValidationErrors } from "@/lib/api";
+import { registrationApi, adminApi, ApiError, getValidationErrors, getFriendlyErrorMessage } from "@/lib/api";
 import type { CreateEntityUserResponse } from "@/lib/api";
 import { validatePassword, validateEmail, validatePhone, validateUsername, type PasswordValidationResult } from "@/lib/password-validation";
 import { toast } from "sonner";
@@ -73,6 +73,8 @@ export default function CreateUser() {
     handleSubmit,
     watch,
     setValue,
+    setError: setFormError,
+    clearErrors,
     formState: { errors },
   } = useForm<UserCreationFormData>({
     resolver: zodResolver(userCreationSchema),
@@ -180,6 +182,7 @@ export default function CreateUser() {
 
     setError(null);
     setValidationErrors([]);
+    clearErrors();
     setIsLoading(true);
 
     try {
@@ -198,26 +201,51 @@ export default function CreateUser() {
       toast.success(response.message || `User '${data.username}' created successfully!`);
     } catch (err) {
       if (err instanceof ApiError) {
-        setValidationErrors(getValidationErrors(err) ?? []);
+        const details = getValidationErrors(err) ?? [];
+        setValidationErrors(details);
+        const formFields: Record<string, keyof UserCreationFormData> = {
+          username: "username",
+          email: "email",
+          password: "password",
+          confirmPassword: "confirmPassword",
+          entity_id: "entityId",
+          entityId: "entityId",
+          full_name: "fullName",
+          fullName: "fullName",
+          role: "role",
+          role_name: "role",
+          phone: "phone",
+        };
+        details.forEach((e) => {
+          const raw = e.field.replace(/^body\s*->\s*/i, "").trim();
+          const field = formFields[raw] ?? raw;
+          if (["fullName", "username", "email", "phone", "role", "entityId", "password", "confirmPassword"].includes(field)) {
+            setFormError(field, { type: "server", message: e.message });
+          }
+        });
         switch (err.code) {
           case "USERNAME_EXISTS":
             setError("This username is already taken. Please choose another.");
+            setFormError("username", { type: "server", message: "This username is already taken." });
             break;
           case "EMAIL_EXISTS":
             setError("This email is already registered to another user.");
+            setFormError("email", { type: "server", message: "This email is already registered." });
             break;
           case "WEAK_PASSWORD":
             setError("Password does not meet requirements. Please check the requirements above.");
+            setFormError("password", { type: "server", message: "Password does not meet all requirements." });
             break;
           case "ENTITY_REQUIRED":
           case "ENTITY_NOT_FOUND":
             setError("Entity not found or inactive.");
+            setFormError("entityId", { type: "server", message: "Entity not found or inactive." });
             break;
           default:
-            setError(err.message || "An unexpected error occurred. Please try again.");
+            setError(details.length ? "Please fix the errors in the form." : getFriendlyErrorMessage(err));
         }
       } else {
-        setError("Connection error. Please check your internet connection and try again.");
+        setError("We couldn't create the user. Please check your connection and try again.");
       }
     } finally {
       setIsLoading(false);
