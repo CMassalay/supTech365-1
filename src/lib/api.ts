@@ -1037,6 +1037,36 @@ export async function getSubmissionStatus(referenceNumber: string): Promise<Subm
   );
 }
 
+/** Raw list submission item from API (uses reference_number, etc.). */
+interface ApiSubmissionListItem {
+  id?: string;
+  reference_number: string;
+  report_type: string;
+  status: string;
+  current_stage?: string;
+  submitted_at: string;
+  submission_method?: string;
+  entity_reference?: string | null;
+}
+
+/** Wrapped list response from API: { success, data: { submissions, pagination } }. */
+interface ApiListSubmissionsResponse {
+  success?: boolean;
+  data?: {
+    submissions: ApiSubmissionListItem[];
+    pagination: { page: number; limit: number; total: number; total_pages: number };
+  };
+}
+
+function mapApiSubmissionToItem(api: ApiSubmissionListItem): SubmissionListItem {
+  return {
+    reference: api.reference_number,
+    status: api.status,
+    report_type: api.report_type,
+    submitted_at: api.submitted_at,
+  };
+}
+
 /** GET /api/v1/submission/ - List submissions with filters and pagination */
 export async function listSubmissions(params: ListSubmissionsParams = {}): Promise<ListSubmissionsResponse> {
   const q = new URLSearchParams();
@@ -1048,7 +1078,45 @@ export async function listSubmissions(params: ListSubmissionsParams = {}): Promi
   if (params.page != null) q.set("page", String(params.page));
   if (params.limit != null) q.set("limit", String(params.limit));
   const qs = q.toString();
-  return apiRequest<ListSubmissionsResponse>(`/api/v1/submission/${qs ? `?${qs}` : ""}`, { method: "GET" });
+  const url = `${API_BASE_URL}/api/v1/submission/${qs ? `?${qs}` : ""}`;
+  const token = getStoredToken();
+  const headers: HeadersInit = { Accept: "application/json" };
+  if (token) (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  const response = await fetch(url, { method: "GET", headers, credentials: "omit" });
+  const isJson = response.headers.get("content-type")?.includes("application/json");
+  const body = isJson ? await response.json().catch(() => ({})) : {};
+  if (!response.ok) {
+    const fallback = "Failed to load submissions";
+    const parsed =
+      typeof body === "object" && body !== null
+        ? parseErrorBody(body, response.status, fallback)
+        : { code: "LIST_ERROR", message: response.statusText || fallback };
+    throw new ApiError(parsed.code, parsed.message, response.status, body);
+  }
+  // API returns { success, data: { submissions, pagination } }
+  const wrapped = body as ApiListSubmissionsResponse;
+  if (wrapped?.data?.submissions && wrapped?.data?.pagination) {
+    const { submissions: apiSubmissions, pagination } = wrapped.data;
+    return {
+      submissions: apiSubmissions.map(mapApiSubmissionToItem),
+      total: pagination.total,
+      page: pagination.page,
+      limit: pagination.limit,
+      total_pages: pagination.total_pages,
+    };
+  }
+  // Fallback: assume response is already ListSubmissionsResponse (flat submissions/total/page/limit)
+  const flat = body as ListSubmissionsResponse;
+  if (Array.isArray(flat?.submissions)) {
+    return {
+      submissions: flat.submissions,
+      total: flat.total ?? 0,
+      page: flat.page ?? 1,
+      limit: flat.limit ?? 25,
+      total_pages: flat.total_pages,
+    };
+  }
+  return { submissions: [], total: 0, page: 1, limit: 25 };
 }
 
 /** GET /api/v1/submission/recent */
