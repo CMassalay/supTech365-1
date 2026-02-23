@@ -953,6 +953,12 @@ export interface SubmissionListItem {
   report_type: string;
   submitted_at: string;
   entity_report_id?: string;
+  /** Admin list: current stage label */
+  current_stage?: string;
+  /** Admin list: excel or api */
+  submission_method?: string;
+  /** Admin list: entity reference */
+  entity_reference?: string | null;
 }
 
 export interface ListSubmissionsResponse {
@@ -1031,10 +1037,24 @@ export async function downloadSubmissionTemplate(
 
 /** GET /api/v1/submission/{reference_number}/status */
 export async function getSubmissionStatus(referenceNumber: string): Promise<SubmissionStatusResponse> {
-  return apiRequest<SubmissionStatusResponse>(
+  const res = await apiRequest<SubmissionStatusResponse | { success?: boolean; data?: Record<string, unknown> }>(
     `/api/v1/submission/${encodeURIComponent(referenceNumber)}/status`,
     { method: "GET" }
   );
+  // Unwrap { success, data } if present; support reference_number from API
+  const raw = (res && typeof res === "object" && "data" in res && (res as { data?: unknown }).data) as Record<string, unknown> | undefined;
+  if (raw && typeof raw === "object") {
+    return {
+      reference: (raw.reference as string) ?? (raw.reference_number as string) ?? referenceNumber,
+      status: String(raw.status ?? ""),
+      report_type: String(raw.report_type ?? ""),
+      submitted_at: String(raw.submitted_at ?? ""),
+      last_updated_at: raw.last_updated_at != null ? String(raw.last_updated_at) : undefined,
+      entity_report_id: raw.entity_report_id != null ? String(raw.entity_report_id) : undefined,
+      notes: raw.notes != null ? String(raw.notes) : undefined,
+    };
+  }
+  return res as SubmissionStatusResponse;
 }
 
 /** Raw list submission item from API (uses reference_number, etc.). */
@@ -1064,6 +1084,9 @@ function mapApiSubmissionToItem(api: ApiSubmissionListItem): SubmissionListItem 
     status: api.status,
     report_type: api.report_type,
     submitted_at: api.submitted_at,
+    current_stage: api.current_stage,
+    submission_method: api.submission_method,
+    entity_reference: api.entity_reference,
   };
 }
 
@@ -1124,4 +1147,88 @@ export async function getRecentSubmissions(limit: number = 10): Promise<ListSubm
   return apiRequest<ListSubmissionsResponse>(`/api/v1/submission/recent?limit=${Math.min(50, Math.max(1, limit))}`, {
     method: "GET",
   });
+}
+
+// --- Admin submissions (all entities) ---
+
+/** GET /api/v1/admin/submissions/recent - List recent submissions from all entities. Requires TECH_ADMIN, OIC, or SUPER_ADMIN. */
+export async function getAdminRecentSubmissions(limit: number = 10): Promise<ListSubmissionsResponse> {
+  const safeLimit = Math.min(50, Math.max(1, limit));
+  const url = `${API_BASE_URL}/api/v1/admin/submissions/recent?limit=${safeLimit}`;
+  const token = getStoredToken();
+  const headers: HeadersInit = { Accept: "application/json" };
+  if (token) (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  const response = await fetch(url, { method: "GET", headers, credentials: "omit" });
+  const isJson = response.headers.get("content-type")?.includes("application/json");
+  const body = isJson ? await response.json().catch(() => ({})) : {};
+  if (!response.ok) {
+    const fallback = "Failed to load recent submissions";
+    const parsed =
+      typeof body === "object" && body !== null
+        ? parseErrorBody(body, response.status, fallback)
+        : { code: "ADMIN_SUBMISSIONS_ERROR", message: response.statusText || fallback };
+    throw new ApiError(parsed.code, parsed.message, response.status, body);
+  }
+  const wrapped = body as ApiListSubmissionsResponse;
+  if (wrapped?.data?.submissions && wrapped?.data?.pagination) {
+    const { submissions: apiSubmissions, pagination } = wrapped.data;
+    return {
+      submissions: apiSubmissions.map(mapApiSubmissionToItem),
+      total: pagination.total,
+      page: pagination.page,
+      limit: pagination.limit,
+      total_pages: pagination.total_pages,
+    };
+  }
+  const flat = body as ListSubmissionsResponse;
+  if (Array.isArray(flat?.submissions)) {
+    return {
+      submissions: flat.submissions,
+      total: flat.total ?? 0,
+      page: flat.page ?? 1,
+      limit: flat.limit ?? 25,
+      total_pages: flat.total_pages,
+    };
+  }
+  return { submissions: [], total: 0, page: 1, limit: safeLimit };
+}
+
+/** GET /api/v1/admin/submissions/csv - Export recent submissions from all entities as CSV. Requires TECH_ADMIN, OIC, or SUPER_ADMIN. Triggers browser download. */
+export async function getAdminSubmissionsCsv(limit: number = 10): Promise<void> {
+  const safeLimit = Math.min(50, Math.max(1, limit));
+  const url = `${API_BASE_URL}/api/v1/admin/submissions/csv?limit=${safeLimit}`;
+  const token = getStoredToken();
+  const headers: HeadersInit = {};
+  if (token) (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  const response = await fetch(url, { method: "GET", headers, credentials: "omit" });
+  if (!response.ok) {
+    const ct = response.headers.get("content-type") || "";
+    const body = ct.includes("application/json")
+      ? await response.json().catch(() => ({}))
+      : await response.text();
+    const message =
+      typeof body === "object" && body !== null && "detail" in body
+        ? String((body as { detail?: unknown }).detail)
+        : response.statusText || "Export failed";
+    throw new ApiError("EXPORT_ERROR", message, response.status, body);
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition");
+  let filename = "submissions_export.csv";
+  if (disposition) {
+    const match = /filename[*]?=(?:UTF-8'')?["']?([^"'\s;]+)["']?/i.exec(disposition) ?? /filename=["']?([^"'\s;]+)["']?/i.exec(disposition);
+    if (match?.[1]) filename = match[1].replace(/^["']|["']$/g, "").trim();
+  }
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }

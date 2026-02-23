@@ -162,7 +162,12 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
           label: "Audit & Oversight",
           items: [
             { title: "Audit Logs", href: "/audit", icon: Shield },
-            ...(role === "oic" ? [{ title: "Break-Glass Access Logs", href: "/sessions", icon: Lock }] : []),
+            ...(role === "oic"
+              ? [
+                  { title: "Entity submissions", href: "/admin/submissions", icon: FileText },
+                  { title: "Break-Glass Access Logs", href: "/sessions", icon: Lock },
+                ]
+              : []),
             { title: "System Performance Metrics", href: "/metrics", icon: TrendingUp },
             { title: "Executive Dashboards", href: "/dashboards", icon: LayoutDashboard },
             { title: "System Alerts", href: "/compliance/alerts/active", icon: AlertTriangle },
@@ -184,6 +189,7 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
           items: [
             { title: "User Management", href: "/users", icon: Users },
             { title: "Reporting Entity Management", href: "/entities", icon: Building2 },
+            { title: "Entity submissions", href: "/admin/submissions", icon: FileText },
             { title: "API Keys", href: "/admin/api-keys", icon: Key },
             { title: "Register New Entity", href: "/admin/entities/register", icon: UserPlus },
             { title: "Create User", href: "/admin/users/create", icon: UserRoundPlus },
@@ -196,19 +202,8 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
         },
       ]);
     case "super_admin":
-      // Super Admin: Reporting (2.1), Compliance (2.2), Analysis, Case & Intelligence, Rules (2.5), Audit (2.6), Administration (2.7)
+      // Super Admin: Compliance, Analysis, Case & Intelligence, Audit, Administration (no Reporting Entity workspace)
       return withHome([
-        {
-          label: "Reporting Entity",
-          items: [
-            { title: "Submit Report", href: "/submit", icon: Upload },
-            { title: "My Submissions", href: "/submissions", icon: FileText },
-            { title: "Resubmissions", href: "/resubmissions", icon: RotateCcw },
-            { title: "Submission Statistics", href: "/statistics", icon: BarChart3 },
-            { title: "My Entity", href: "/my-entity", icon: Building2 },
-            { title: "API Credentials", href: "/api-credentials", icon: Key },
-          ],
-        },
         {
           label: "Compliance",
           items: [
@@ -251,6 +246,7 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
           items: [
             { title: "User Management", href: "/users", icon: Users },
             { title: "Reporting Entity Management", href: "/entities", icon: Building2 },
+            { title: "Entity submissions", href: "/admin/submissions", icon: FileText },
             { title: "API Keys", href: "/admin/api-keys", icon: Key },
             { title: "Register New Entity", href: "/admin/entities/register", icon: UserPlus },
             { title: "Create User", href: "/admin/users/create", icon: UserRoundPlus },
