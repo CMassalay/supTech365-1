@@ -62,6 +62,7 @@ import NotificationsPage from "./pages/notifications/NotificationsPage";
 import EntitiesPage from "./pages/admin/EntitiesPage";
 import EntityDetailPage from "./pages/admin/EntityDetailPage";
 import AdminApiKeysPage from "./pages/admin/AdminApiKeysPage";
+import AdminSubmissionsPage from "./pages/admin/AdminSubmissionsPage";
 import SessionsPage from "./pages/admin/SessionsPage";
 import ProfilePage from "./pages/profile/ProfilePage";
 import SubjectSearchPage from "./pages/subjects/SubjectSearchPage";
@@ -164,6 +165,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/admin/submissions"
+                element={
+                  <ProtectedRoute requiredRole={["tech_admin", "super_admin", "oic"]}>
+                    <AdminSubmissionsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/admin/api-keys"
                 element={
                   <ProtectedRoute requiredRole={["tech_admin", "super_admin"]}>
@@ -179,16 +188,79 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              {/* Reporting Entity Workspace Routes (f2.md Section 2.1) */}
-              <Route path="/submit" element={<SubmitReport />} />
-              <Route path="/my-entity" element={<MyEntityPage />} />
-              <Route path="/submissions" element={<MySubmissions />} />
-              <Route path="/submissions/:id" element={<SubmissionDetail />} />
-              <Route path="/submissions/:id/result" element={<ValidationResult />} />
-              <Route path="/submissions/:id/errors" element={<ValidationErrorReport />} />
-              <Route path="/resubmissions" element={<Resubmissions />} />
-              <Route path="/statistics" element={<Statistics />} />
-              <Route path="/api-credentials" element={<ApiCredentialsPage />} />
+              {/* Reporting Entity Workspace Routes (f2.md Section 2.1) - reporting_entity only */}
+              <Route
+                path="/submit"
+                element={
+                  <ProtectedRoute requiredRole={["reporting_entity"]}>
+                    <SubmitReport />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/my-entity"
+                element={
+                  <ProtectedRoute requiredRole={["reporting_entity"]}>
+                    <MyEntityPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/submissions"
+                element={
+                  <ProtectedRoute requiredRole={["reporting_entity"]}>
+                    <MySubmissions />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/submissions/:id"
+                element={
+                  <ProtectedRoute requiredRole={["reporting_entity"]}>
+                    <SubmissionDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/submissions/:id/result"
+                element={
+                  <ProtectedRoute requiredRole={["reporting_entity"]}>
+                    <ValidationResult />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/submissions/:id/errors"
+                element={
+                  <ProtectedRoute requiredRole={["reporting_entity"]}>
+                    <ValidationErrorReport />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/resubmissions"
+                element={
+                  <ProtectedRoute requiredRole={["reporting_entity"]}>
+                    <Resubmissions />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/statistics"
+                element={
+                  <ProtectedRoute requiredRole={["reporting_entity"]}>
+                    <Statistics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/api-credentials"
+                element={
+                  <ProtectedRoute requiredRole={["reporting_entity"]}>
+                    <ApiCredentialsPage />
+                  </ProtectedRoute>
+                }
+              />
               {/* Subject Profiling (FDD Feature 7) */}
               <Route path="/subjects" element={<SubjectSearchPage />} />
               <Route path="/subjects/:uuid" element={<SubjectProfilePage />} />
