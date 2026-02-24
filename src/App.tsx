@@ -184,14 +184,76 @@ const App = () => (
               <Route path="/subjects" element={<SubjectSearchPage />} />
               <Route path="/subjects/:uuid" element={<SubjectProfilePage />} />
               {/* Compliance Workspace Routes (f2.md Section 2.2) */}
-              <Route path="/compliance/validation" element={<ValidationQueue />} />
+              <Route
+                path="/compliance/validation"
+                element={
+                  <ProtectedRoute requiredRole={["director_ops", "oic", "super_admin"]}>
+                    <ValidationQueue />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/compliance/validation/pending" element={<PendingValidations />} />
               <Route path="/compliance/validation/assign" element={<AssignValidations />} />
               <Route path="/compliance/validation/all" element={<AllValidations />} />
-              <Route path="/compliance/validation/:reportId/validate" element={<ValidationDetail />} />
-              <Route path="/compliance/validation-queue" element={<ManualValidationQueue />} />
-              <Route path="/compliance/validation-queue/:submissionId" element={<ReportReview />} />
-              <Route path="/compliance/validation-audit-logs" element={<ValidationAuditLogs />} />
+              <Route
+                path="/compliance/validation/:reportId/validate"
+                element={
+                  <ProtectedRoute requiredRole={["director_ops", "oic", "super_admin"]}>
+                    <ValidationDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/validation-queue"
+                element={
+                  <ProtectedRoute
+                    requiredRole={[
+                      "head_of_compliance",
+                      "head_of_analysis",
+                      "compliance_officer",
+                      "analyst",
+                      "super_admin",
+                    ]}
+                  >
+                    <ManualValidationQueue />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/validation-queue/:submissionId"
+                element={
+                  <ProtectedRoute
+                    requiredRole={[
+                      "head_of_compliance",
+                      "head_of_analysis",
+                      "compliance_officer",
+                      "analyst",
+                      "super_admin",
+                    ]}
+                  >
+                    <ReportReview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/validation-audit-logs"
+                element={
+                  <ProtectedRoute
+                    requiredRole={[
+                      "head_of_compliance",
+                      "head_of_analysis",
+                      "compliance_officer",
+                      "analyst",
+                      "director_ops",
+                      "oic",
+                      "tech_admin",
+                      "super_admin",
+                    ]}
+                  >
+                    <ValidationAuditLogs />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/compliance/ctr-review" element={<CTRReview />} />
               <Route path="/compliance/ctr-review/all" element={<AllCTRs />} />
               <Route path="/compliance/ctr-review/overdue" element={<OverdueCTRs />} />
@@ -225,9 +287,23 @@ const App = () => (
               <Route path="/compliance/dashboards/escalation" element={<EscalationRateTrends />} />
               <Route path="/compliance/dashboards/quality" element={<ValidationQualityMetrics />} />
               {/* Legacy routes for backward compatibility */}
-              <Route path="/validation" element={<ValidationQueue />} />
+              <Route
+                path="/validation"
+                element={
+                  <ProtectedRoute requiredRole={["director_ops", "oic", "super_admin"]}>
+                    <ValidationQueue />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/validation/all" element={<AllValidations />} />
-              <Route path="/validation/:id/validate" element={<ValidationDetail />} />
+              <Route
+                path="/validation/:id/validate"
+                element={
+                  <ProtectedRoute requiredRole={["director_ops", "oic", "super_admin"]}>
+                    <ValidationDetail />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/escalation" element={<EscalationQueue />} />
               <Route path="/escalation/:id/review" element={<EscalationApprovalDetail />} />
               <Route path="/workload" element={<WorkloadManagement />} />
