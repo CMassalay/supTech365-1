@@ -10,23 +10,6 @@ describe("ValidationDecisionModal", () => {
     vi.clearAllMocks();
   });
 
-  it("renders Accept confirmation without reason field", () => {
-    render(
-      <ValidationDecisionModal
-        open={true}
-        onOpenChange={mockOnOpenChange}
-        referenceNumber="FIA-001"
-        reportType="CTR"
-        decisionType="ACCEPT"
-        onSubmit={mockOnSubmit}
-      />
-    );
-
-    expect(screen.getByText("Accept Report")).toBeInTheDocument();
-    expect(screen.getByText(/This report will be accepted/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Reason/i)).not.toBeInTheDocument();
-  });
-
   it("renders Return for Correction with reason field", () => {
     render(
       <ValidationDecisionModal

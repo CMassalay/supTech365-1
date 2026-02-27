@@ -36,6 +36,26 @@ npm i
 npm run dev
 ```
 
+## Server Startup Information
+
+⚠️ **IMPORTANT: Always start servers from their respective directories**
+
+**Frontend Server:**
+- **Command**: `npm run dev` (must run from `liberia_suptech_fe/` directory)
+- **Port**: 8080
+- **URL**: http://localhost:8080/
+
+**Backend Server:**
+- **Command**: `python main.py` (from `liberia_suptech_be/` directory)
+- **Port**: 8000
+- **URL**: http://localhost:8000/
+- **API Docs**: http://localhost:8000/docs
+
+**Common Startup Issues:**
+- **Wrong directory**: npm commands must be run from `liberia_suptech_fe/`, not the project root
+- **Port confusion**: Frontend runs on port 8080, not 5173 (Vite default)
+- **Windows PowerShell**: Use `cmd.exe` or separate commands instead of `&&` operator
+
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).

@@ -99,7 +99,7 @@ describe("ReportReview", () => {
     expect(screen.getByText("John Doe")).toBeInTheDocument();
   });
 
-  it("opens the decision modal when clicking Accept", () => {
+  it("does not show accept action in optional manual-validation mode", () => {
     (manualValidationHooks.useReportContent as any).mockReturnValue({
       data: mockReportContent,
       isLoading: false,
@@ -111,11 +111,7 @@ describe("ReportReview", () => {
 
     renderWithProviders(<ReportReview />);
 
-    const acceptButton = screen.getByRole("button", { name: /accept/i });
-    fireEvent.click(acceptButton);
-
-    expect(mockSetSelectedSubmission).toHaveBeenCalledWith("uuid-1");
-    expect(mockOpenDecisionModal).toHaveBeenCalledWith("ACCEPT");
+    expect(screen.queryByRole("button", { name: /accept/i })).not.toBeInTheDocument();
   });
 
   it("opens the decision modal when clicking Return for Correction", () => {

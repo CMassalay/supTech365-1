@@ -3,18 +3,21 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CheckCircle2, RotateCcw, XCircle } from "lucide-react";
+import { ArrowLeft, RotateCcw, XCircle, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useReportContent, useSubmitDecision } from "@/hooks/useManualValidation";
 import { useValidationStore } from "@/hooks/useValidationStore";
 import { TransactionTable } from "@/components/compliance/validation/TransactionTable";
 import { ValidationDecisionModal } from "@/components/compliance/validation/ValidationDecisionModal";
-import type { DecisionType } from "@/types/manualValidation";
+import type { ManualDecisionType } from "@/types/manualValidation";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ReportReview() {
   const { submissionId } = useParams<{ submissionId: string }>();
   const navigate = useNavigate();
-  const { data: report, isLoading } = useReportContent(submissionId || "");
+  const { user } = useAuth();
+  const { data: detailData, isLoading } = useReportContent(submissionId || "");
+  const report = detailData?.report;
   const { mutateAsync: submitDecision, isPending } = useSubmitDecision();
   const {
     decisionModalOpen,
@@ -24,9 +27,18 @@ export default function ReportReview() {
     setSelectedSubmission,
   } = useValidationStore();
 
+  const queueRoute =
+    user?.role === "compliance_officer" || user?.role === "analyst"
+      ? "/compliance/validation-queue"
+      : "/compliance/manual-validation";
+  const queueLabel =
+    user?.role === "compliance_officer" || user?.role === "analyst"
+      ? "My Assigned Validations"
+      : "Manual Validation Queue";
+
   const breadcrumbItems = [
     { label: "Compliance", href: "/compliance/validation" },
-    { label: "Manual Validation Queue", href: "/compliance/validation-queue" },
+    { label: queueLabel, href: queueRoute },
     { label: "Report Review", href: "#" },
   ];
 
@@ -34,13 +46,28 @@ export default function ReportReview() {
     return null;
   }
 
-  const handleSubmitDecision = async (payload: { decision: DecisionType; reason?: string }) => {
-    await submitDecision({ submissionId, data: payload });
-    closeDecisionModal();
-    navigate("/compliance/validation-queue");
+  const handleAccept = async () => {
+    if (!submissionId) return;
+    try {
+      await submitDecision({ submissionId, data: { decision: "ACCEPT" } });
+      navigate(queueRoute);
+    } catch (error) {
+      console.error("Failed to accept report:", error);
+    }
   };
 
-  const openModal = (type: DecisionType) => {
+  const handleSubmitDecision = async (payload: any) => {
+    try {
+      await submitDecision({ submissionId, data: payload });
+      closeDecisionModal();
+      navigate(queueRoute);
+    } catch (error) {
+      console.error("Failed to submit decision:", error);
+      // Don't navigate on error - stay on the review page to show error state
+    }
+  };
+
+  const openModal = (type: ManualDecisionType) => {
     setSelectedSubmission(submissionId);
     openDecisionModal(type);
   };
@@ -49,9 +76,9 @@ export default function ReportReview() {
     <MainLayout>
       <div className="p-6 space-y-6">
         <Breadcrumb items={breadcrumbItems} />
-        <Button variant="ghost" onClick={() => navigate("/compliance/validation-queue")}>
+        <Button variant="ghost" onClick={() => navigate(queueRoute)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Queue
+          Back to {queueLabel}
         </Button>
 
         <h1 className="text-2xl font-bold">
@@ -67,15 +94,10 @@ export default function ReportReview() {
               ) : (
                 <>
                   <p><strong>Reference:</strong> {report?.reference_number}</p>
-                  <p><strong>Type:</strong> {report?.report_type}</p>
-                  <p><strong>Entity:</strong> {report?.entity.name}</p>
-                  <p><strong>Submitted:</strong> {new Date(report?.submitted_at || "").toLocaleString()}</p>
-                  <p><strong>Submitted By:</strong> {report?.submitted_by.username}</p>
-                  <p>
-                    <strong>Reporting Period:</strong>{" "}
-                    {String(report?.metadata?.reportingPeriod ?? "N/A")}
-                  </p>
-                  <p><strong>Status:</strong> <Badge>{report?.validation_status}</Badge></p>
+                  <p>Type: {report?.report_type}</p>
+                  <p><strong>Entity:</strong> {report?.entity?.name || "N/A"}</p>
+                  <p><strong>Submitted:</strong> {report?.submitted_at ? new Date(report.submitted_at).toLocaleString() : "N/A"}</p>
+                  <p><strong>Status:</strong> <Badge>{report?.status || "PENDING"}</Badge></p>
                 </>
               )}
             </CardContent>
@@ -84,7 +106,7 @@ export default function ReportReview() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Transactions ({report?.transactions.length ?? 0})</CardTitle>
+            <CardTitle>Transactions ({report?.transactions?.length ?? 0})</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -96,15 +118,15 @@ export default function ReportReview() {
         </Card>
 
         <div className="flex gap-3">
-          <Button onClick={() => openModal("ACCEPT")} disabled={isLoading}>
-            <CheckCircle2 className="h-4 w-4 mr-2" />
+          <Button onClick={handleAccept} disabled={isLoading || isPending}>
+            <Check className="h-4 w-4 mr-2" />
             Accept
           </Button>
-          <Button variant="outline" onClick={() => openModal("RETURN")} disabled={isLoading}>
+          <Button variant="outline" onClick={() => openModal("RETURN")} disabled={isLoading || isPending}>
             <RotateCcw className="h-4 w-4 mr-2" />
             Return for Correction
           </Button>
-          <Button variant="destructive" onClick={() => openModal("REJECT")} disabled={isLoading}>
+          <Button variant="destructive" onClick={() => openModal("REJECT")} disabled={isLoading || isPending}>
             <XCircle className="h-4 w-4 mr-2" />
             Reject
           </Button>

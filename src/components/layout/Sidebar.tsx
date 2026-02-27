@@ -54,7 +54,7 @@ interface NavSection {
 
 const HOME_SECTION: NavSection = {
   label: "Main",
-  items: [{ title: "Home", href: "/", icon: Home }],
+  items: [{ title: "Dashboard", href: "/", icon: Home }],
 };
 
 const withHome = (sections: NavSection[]) => [HOME_SECTION, ...sections];
@@ -87,18 +87,10 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
     case "compliance_officer":
       return withHome([
         {
-          label: "My Work",
+          label: "Work & Activity",
           items: [
-            { title: "My Assignments", href: "/my-assignments", icon: ClipboardList },
-            { title: "My Validation Queue", href: "/compliance/validation-queue", icon: Inbox, badge: 8 },
-            { title: "Validation Audit Logs", href: "/compliance/validation-audit-logs", icon: Shield },
-            { title: "CTR Review", href: "/compliance/ctr-review", icon: FileText, badge: 15 },
-            { title: "Alerts", href: "/compliance/alerts/active", icon: AlertTriangle, badge: 3, badgeVariant: "critical" },
-          ],
-        },
-        {
-          label: "My Activity",
-          items: [
+            { title: "Validation Queue", href: "/compliance/validation-queue", icon: Inbox, badge: 8 },
+            { title: "My Assigned CTRs", href: "/compliance/ctr-review", icon: FileText, badge: 15 },
             { title: "Flagged CTRs", href: "/compliance/ctr-review/flagged", icon: Flag },
           ],
         },
@@ -106,34 +98,14 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
     case "head_of_compliance":
       return withHome([
         {
-          label: "My Work",
+          label: "Management",
           items: [
-            { title: "Manual Validation Queue", href: "/compliance/validation-queue", icon: Inbox, badge: 8 },
-            { title: "Validation Audit Logs", href: "/compliance/validation-audit-logs", icon: Shield },
-            { title: "CTR Review", href: "/compliance/ctr-review", icon: FileText, badge: 15 },
-            { title: "Alerts", href: "/compliance/alerts/active", icon: AlertTriangle, badge: 3, badgeVariant: "critical" },
+            { title: "CTR Management Hub", href: "/compliance/validation/all", icon: FileText, badge: 15 },
+            { title: "Escalations", href: "/compliance/escalation/pending", icon: TrendingUp, badge: 4, badgeVariant: "warning" as const },
+            { title: "Team Workload", href: "/supervisor/workload", icon: Users },
+            { title: "System Audit Logs", href: "/audit", icon: Shield },
           ],
         },
-        {
-          label: "My Activity",
-          items: [
-            { title: "Flagged CTRs", href: "/compliance/ctr-review/flagged", icon: Flag },
-          ],
-        },
-        ...(role === "head_of_compliance"
-          ? [
-              {
-                label: "Management",
-                items: [
-                  { title: "Assignment Queue", href: "/supervisor/assignment-queue", icon: ClipboardList },
-                  { title: "Team Workload", href: "/supervisor/workload", icon: Users },
-                  { title: "Pending Validations", href: "/compliance/validation/pending", icon: Inbox, badge: 3, badgeVariant: "warning" as const },
-                  { title: "Assign Validations", href: "/compliance/validation/assign", icon: UserPlus },
-                  { title: "Escalations", href: "/compliance/escalation/pending", icon: TrendingUp, badge: 4, badgeVariant: "warning" as const },
-                ],
-              },
-            ]
-          : []),
       ]);
     case "analyst":
       return withHome([

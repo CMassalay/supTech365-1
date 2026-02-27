@@ -5,87 +5,13 @@ import type {
   QueueFilters,
   QueueResponse,
   ReportContentResponse,
+  ReportDetailsResponse,
   SubmitDecisionRequest,
   SubmitDecisionResponse,
 } from "@/types/manualValidation";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "https://liberia-suptech.onrender.com";
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const mockQueue: QueueResponse = {
-  items: [
-    {
-      submission_id: "1",
-      reference_number: "FIA-2026-0001",
-      report_type: "CTR",
-      entity_name: "First Bank",
-      submitted_at: "2026-02-03T10:30:00Z",
-      entered_queue_at: "2026-02-03T10:31:00Z",
-      transaction_count: 5,
-      total_amount: 150000,
-    },
-    {
-      submission_id: "2",
-      reference_number: "FIA-2026-0002",
-      report_type: "STR",
-      entity_name: "Unity Corp",
-      submitted_at: "2026-02-03T10:35:00Z",
-      entered_queue_at: "2026-02-03T10:36:00Z",
-      transaction_count: 3,
-      total_amount: 76000,
-    },
-  ],
-  total: 2,
-  page: 1,
-  page_size: 20,
-  total_pages: 1,
-};
-
-const mockReport: ReportContentResponse = {
-  submission_id: "1",
-  reference_number: "FIA-2026-001234",
-  report_type: "CTR",
-  entity: { id: "e1", name: "First Bank of Liberia", entity_type: "BANK" },
-  submitted_by: { id: "u1", username: "compliance_officer" },
-  submitted_at: "2026-02-03T10:30:00Z",
-  metadata: { reportingPeriod: "Jan 1-31, 2026" },
-  transactions: [
-    { id: 1, date: "2026-01-15", type: "Deposit", amount: "25000", name: "John Doe", details: "Cash deposit branch #1" },
-    { id: 2, date: "2026-01-16", type: "Withdraw", amount: "15000", name: "Jane Doe", details: "ATM withdrawal" },
-    { id: 3, date: "2026-01-18", type: "Transfer", amount: "50000", name: "ABC Corp", details: "Cross-border transfer" },
-  ],
-  validation_status: "PENDING",
-  automated_validation_passed_at: "2026-02-03T10:31:00Z",
-};
-
-const mockAudit: AuditLogResponse = {
-  items: [
-    {
-      id: "a1",
-      submission_id: "1",
-      reference_number: "FIA-2026-001",
-      decision: "ACCEPT",
-      decided_by: "J.Smith",
-      decided_at: "2026-02-03T11:30:00Z",
-      reason: "",
-    },
-    {
-      id: "a2",
-      submission_id: "2",
-      reference_number: "FIA-2026-002",
-      decision: "RETURN",
-      decided_by: "M.Jones",
-      decided_at: "2026-02-03T12:10:00Z",
-      reason: "Missing transaction origin details and incomplete beneficiary information.",
-    },
-  ],
-  total: 2,
-  page: 1,
-  page_size: 20,
-  total_pages: 1,
-};
 
 function buildUrl(path: string, params?: Record<string, string | number | undefined>) {
   const url = new URL(`${API_BASE_URL}${path}`);
@@ -99,9 +25,14 @@ function buildUrl(path: string, params?: Record<string, string | number | undefi
   return url.toString();
 }
 
-async function request<T>(path: string, init?: RequestInit, params?: Record<string, string | number | undefined>): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  params?: Record<string, string | number | undefined>
+): Promise<T> {
   const token = getStoredToken();
-  const response = await fetch(buildUrl(path, params), {
+  const url = buildUrl(path, params);
+  const response = await fetch(url, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -110,90 +41,129 @@ async function request<T>(path: string, init?: RequestInit, params?: Record<stri
       ...(init?.headers || {}),
     },
   });
+
+  let parsedBody: any = null;
+
   if (!response.ok) {
     let message = "Request failed";
     try {
-      const body = await response.json();
-      message = body?.error?.message || body?.message || message;
+      parsedBody = await response.json();
+      message = parsedBody?.error?.message || parsedBody?.message || message;
     } catch {
       // noop
     }
+
+    // #region agent log
+    fetch("http://127.0.0.1:7246/ingest/c3e0a118-fed4-4495-92ce-731c1630130d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        location: "manualValidationApi.ts:request:error",
+        message: "manualValidationApi request failed",
+        data: {
+          path,
+          url,
+          status: response.status,
+          ok: response.ok,
+        },
+        timestamp: Date.now(),
+        runId: "pre-fix",
+        hypothesisId: "H1",
+      }),
+    }).catch(() => { });
+    // #endregion
+
     throw new Error(message);
   }
-  return (await response.json()) as T;
+
+  try {
+    if (parsedBody === null) {
+      parsedBody = await response.json();
+    }
+
+    // #region agent log
+    fetch("http://127.0.0.1:7246/ingest/c3e0a118-fed4-4495-92ce-731c1630130d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        location: "manualValidationApi.ts:request:success",
+        message: "manualValidationApi request success",
+        data: {
+          path,
+          url,
+          status: response.status,
+          ok: response.ok,
+          total:
+            parsedBody && typeof parsedBody === "object"
+              ? (parsedBody as any).total ?? null
+              : null,
+          itemsLength:
+            parsedBody &&
+              typeof parsedBody === "object" &&
+              Array.isArray((parsedBody as any).items)
+              ? (parsedBody as any).items.length
+              : null,
+        },
+        timestamp: Date.now(),
+        runId: "pre-fix",
+        hypothesisId: "H1",
+      }),
+    }).catch(() => { });
+    // #endregion
+  } catch {
+    // If JSON parsing fails we still proceed and let caller handle it.
+  }
+
+  return parsedBody as T;
 }
 
 export async function fetchValidationQueue(filters: QueueFilters, page: number, pageSize: number): Promise<QueueResponse> {
-  try {
-    return await request<QueueResponse>(
-      "/api/v1/manual-validation/queue",
-      { method: "GET" },
-      {
-        page,
-        page_size: pageSize,
-        report_type: filters.reportType,
-        from_date: filters.dateFrom,
-        to_date: filters.dateTo,
-        search: filters.search,
-        assigned_to_me: filters.assignedToMe ? "true" : undefined,
-      }
-    );
-  } catch {
-    await delay(250);
-    return mockQueue;
-  }
+  return await request<QueueResponse>(
+    "/api/v1/validation/manual-validation/queue",
+    { method: "GET" },
+    {
+      page,
+      page_size: pageSize,
+      report_type: filters.reportType,
+      from_date: filters.dateFrom,
+      to_date: filters.dateTo,
+      search: filters.search,
+      assigned_to_me: filters.assignedToMe ? "true" : undefined,
+    }
+  );
 }
 
-export async function fetchReportContent(submissionId: string): Promise<ReportContentResponse> {
-  try {
-    return await request<ReportContentResponse>(`/api/v1/manual-validation/reports/${encodeURIComponent(submissionId)}`, {
+export async function fetchReportContent(submission_id: string): Promise<ReportDetailsResponse> {
+  return await request<ReportDetailsResponse>(
+    `/api/v1/validation/manual-validation/reports/${encodeURIComponent(submission_id)}`,
+    {
       method: "GET",
-    });
-  } catch {
-    await delay(200);
-    return { ...mockReport, submission_id: submissionId };
-  }
+    }
+  );
 }
 
 export async function submitValidationDecision(
   submissionId: string,
   data: SubmitDecisionRequest
 ): Promise<SubmitDecisionResponse> {
-  try {
-    return await request<SubmitDecisionResponse>(
-      `/api/v1/manual-validation/reports/${encodeURIComponent(submissionId)}/decision`,
-      { method: "POST", body: JSON.stringify(data) }
-    );
-  } catch {
-    await delay(200);
-    return {
-      submission_id: submissionId,
-      reference_number: mockReport.reference_number,
-      decision: data.decision,
-      decided_at: new Date().toISOString(),
-      message: "Decision submitted successfully",
-      routed_to_queue: data.decision === "ACCEPT" ? "NEXT_QUEUE" : undefined,
-    };
-  }
+  return await request<SubmitDecisionResponse>(
+    `/api/v1/validation/manual-validation/reports/${encodeURIComponent(submissionId)}/decision`,
+    { method: "POST", body: JSON.stringify(data) }
+  );
 }
 
 export async function fetchAuditLogs(filters: AuditLogFilters, page: number, pageSize: number): Promise<AuditLogResponse> {
-  try {
-    return await request<AuditLogResponse>(
-      "/api/v1/manual-validation/audit-logs",
-      { method: "GET" },
-      {
-        page,
-        page_size: pageSize,
-        decision: filters.decision,
-        from_date: filters.dateFrom,
-        to_date: filters.dateTo,
-        decided_by: filters.decidedBy,
-        submission_reference: filters.submissionReference,
-      }
-    );
-  } catch {
-    await delay(250);
-    return mockAudit;
-  }
+  return await request<AuditLogResponse>(
+    "/api/v1/validation/manual-validation/audit-logs",
+    { method: "GET" },
+    {
+      page,
+      page_size: pageSize,
+      decision: filters.decision,
+      from_date: filters.dateFrom,
+      to_date: filters.dateTo,
+      decided_by: filters.decidedBy,
+      submission_reference: filters.submissionReference,
+    }
+  );
 }

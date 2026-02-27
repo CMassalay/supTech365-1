@@ -18,7 +18,7 @@ import { ValidationQueueFilters } from "@/components/compliance/validation/Valid
 import { ValidationQueueTable } from "@/components/compliance/validation/ValidationQueueTable";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import type { QueueFilters, ReportType } from "@/types/manualValidation";
+import type { QueueFilters, QueueItem, ReportType } from "@/types/manualValidation";
 
 export default function ManualValidationQueue() {
   const navigate = useNavigate();
@@ -63,7 +63,26 @@ export default function ManualValidationQueue() {
   const total = data?.total ?? 0;
   const items = data?.items ?? [];
   const isPersonalQueue = user?.role === "compliance_officer" || user?.role === "analyst";
-  const pageTitle = isPersonalQueue ? "My Validation Queue" : "Manual Validation Queue";
+  const pageTitle = isPersonalQueue ? "My Assigned Validations" : "Manual Validation Queue";
+
+  const getDueDate = (item: QueueItem) => {
+    if (item.due_at) {
+      return new Date(item.due_at);
+    }
+    const enteredAt = new Date(item.entered_queue_at || item.submitted_at);
+    return new Date(enteredAt.getTime() + 48 * 60 * 60 * 1000);
+  };
+
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const dueA = getDueDate(a).getTime();
+      const dueB = getDueDate(b).getTime();
+      if (dueA !== dueB) {
+        return dueA - dueB;
+      }
+      return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime();
+    });
+  }, [items]);
 
   const breadcrumbItems = [
     { label: "Compliance", href: "/compliance/validation-queue" },
@@ -77,15 +96,13 @@ export default function ManualValidationQueue() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Inbox className="h-6 w-6" />
-            {pageTitle}
+            {pageTitle} ({total} CTRs)
           </h1>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
         </div>
-
-        <p className="text-muted-foreground">Pending Reviews: {total}</p>
 
         <Card>
           <CardContent className="pt-6">
@@ -109,7 +126,7 @@ export default function ManualValidationQueue() {
                 <div className="py-12 text-center text-sm text-muted-foreground">Loading queue...</div>
               ) : (
                 <ValidationQueueTable
-                  items={items}
+                  items={sortedItems}
                   onViewDetails={(submissionId) => navigate(`/compliance/validation-queue/${submissionId}`)}
                 />
               )}
@@ -117,7 +134,7 @@ export default function ManualValidationQueue() {
 
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-muted-foreground">
-                Showing {items.length ? (page - 1) * pageSize + 1 : 0}-{(page - 1) * pageSize + items.length} of {total}
+                Showing {sortedItems.length ? (page - 1) * pageSize + 1 : 0}-{(page - 1) * pageSize + sortedItems.length} of {total}
               </p>
               <Pagination>
                 <PaginationContent>

@@ -131,6 +131,7 @@ export default function ValidationAuditLogs() {
                     <TableHead>Decision</TableHead>
                     <TableHead>User</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead>Justification</TableHead>
                     <TableHead className="w-24">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -153,6 +154,9 @@ export default function ValidationAuditLogs() {
                       </TableCell>
                       <TableCell>{entry.decided_by}</TableCell>
                       <TableCell>{new Date(entry.decided_at).toLocaleDateString()}</TableCell>
+                      <TableCell className="max-w-[320px] truncate" title={entry.reason || "No reason provided"}>
+                        {entry.reason || "No reason provided"}
+                      </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={() => setSelectedEntry(entry)}>
                           <Eye className="h-4 w-4" />

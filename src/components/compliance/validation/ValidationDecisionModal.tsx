@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -22,16 +21,21 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { validationDecisionSchema, type ValidationDecisionFormData } from "@/lib/validationSchema";
-import type { DecisionType } from "@/types/manualValidation";
+import type { ManualDecisionType } from "@/types/manualValidation";
 
 interface ValidationDecisionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   referenceNumber: string;
   reportType: "CTR" | "STR";
-  decisionType: DecisionType | null;
+  decisionType: ManualDecisionType | null;
   isSubmitting?: boolean;
-  onSubmit: (payload: { decision: DecisionType; reason?: string }) => void;
+  onSubmit: (payload: {
+    decision: ManualDecisionType;
+    reason?: string;
+    return_reason?: string;
+    rejection_reason?: string;
+  }) => void;
 }
 
 export function ValidationDecisionModal({
@@ -45,7 +49,7 @@ export function ValidationDecisionModal({
 }: ValidationDecisionModalProps) {
   const form = useForm<ValidationDecisionFormData>({
     resolver: zodResolver(validationDecisionSchema),
-    defaultValues: { decision: "ACCEPT", reason: "" },
+    defaultValues: { decision: "RETURN", reason: "" },
   });
 
   useEffect(() => {
@@ -56,9 +60,7 @@ export function ValidationDecisionModal({
 
   if (!decisionType) return null;
 
-  const requiresReason = decisionType === "RETURN" || decisionType === "REJECT";
-
-  const titleByDecision: Record<DecisionType, string> = {
+  const titleByDecision: Record<ManualDecisionType, string> = {
     ACCEPT: "Accept Report",
     RETURN: "Return Report for Correction",
     REJECT: "Reject Report",
@@ -76,38 +78,35 @@ export function ValidationDecisionModal({
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit((data) =>
-              onSubmit({
+            onSubmit={form.handleSubmit((data) => {
+              const payload: any = {
                 decision: data.decision,
-                reason: data.reason?.trim() || undefined,
-              })
-            )}
+              };
+              if (data.decision === "RETURN") {
+                payload.return_reason = data.reason?.trim();
+              } else if (data.decision === "REJECT") {
+                payload.rejection_reason = data.reason?.trim();
+              } else {
+                payload.reason = data.reason?.trim();
+              }
+              onSubmit(payload);
+            })}
             className="space-y-4"
           >
-            {!requiresReason && (
-              <Alert>
-                <AlertDescription>
-                  This report will be accepted and routed to the next queue.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {requiresReason && (
-              <FormField
-                control={form.control}
-                name="reason"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Reason for {decisionType === "RETURN" ? "Return" : "Reject"} *</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} rows={5} placeholder="Please provide a clear reason..." />
-                    </FormControl>
-                    <FormDescription>Minimum 10 characters, maximum 2000 characters.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            <FormField
+              control={form.control}
+              name="reason"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Reason for {decisionType === "RETURN" ? "Return" : "Reject"} *</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} rows={5} placeholder="Please provide a clear reason..." />
+                  </FormControl>
+                  <FormDescription>Minimum 10 characters, maximum 2000 characters.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -116,11 +115,9 @@ export function ValidationDecisionModal({
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting
                   ? "Submitting..."
-                  : decisionType === "ACCEPT"
-                    ? "Confirm Accept"
-                    : decisionType === "RETURN"
-                      ? "Confirm Return"
-                      : "Confirm Reject"}
+                  : decisionType === "RETURN"
+                    ? "Confirm Return"
+                    : "Confirm Reject"}
               </Button>
             </DialogFooter>
           </form>

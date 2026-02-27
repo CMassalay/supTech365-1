@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AuditLogFilters, DecisionType, QueueFilters } from "@/types/manualValidation";
+import type { AuditLogFilters, ManualDecisionType, QueueFilters } from "@/types/manualValidation";
 
 interface ValidationStore {
   queueFilters: QueueFilters;
@@ -11,8 +11,8 @@ interface ValidationStore {
   resetAuditLogFilters: () => void;
 
   decisionModalOpen: boolean;
-  selectedDecisionType: DecisionType | null;
-  openDecisionModal: (type: DecisionType) => void;
+  selectedDecisionType: ManualDecisionType | null;
+  openDecisionModal: (type: ManualDecisionType) => void;
   closeDecisionModal: () => void;
 
   selectedSubmissionId: string | null;

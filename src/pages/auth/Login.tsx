@@ -111,12 +111,12 @@ export default function Login() {
         const role = mapBackendRole(response.user.role);
         const roleRoutes: Record<string, string> = {
           reporting_entity: "/submissions",
-          compliance_officer: "/compliance/validation/assigned",
-          head_of_compliance: "/compliance/dashboards",
-          analyst: "/analysis/queue/assigned",
-          head_of_analysis: "/analysis/dashboards",
-          director_ops: "/audit/dashboards/director-ops",
-          oic: "/audit/dashboards/oic",
+          compliance_officer: "/compliance/validation-queue",
+          head_of_compliance: "/compliance/validation-queue",
+          analyst: "/compliance/validation-queue",
+          head_of_analysis: "/compliance/validation-queue",
+          director_ops: "/compliance/validation",
+          oic: "/compliance/validation",
           tech_admin: "/",
           super_admin: "/",
         };

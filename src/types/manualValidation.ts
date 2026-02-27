@@ -1,5 +1,6 @@
 export type ReportType = "CTR" | "STR";
 export type DecisionType = "ACCEPT" | "RETURN" | "REJECT";
+export type ManualDecisionType = "ACCEPT" | "RETURN" | "REJECT";
 
 export interface QueueFilters {
   reportType?: ReportType;
@@ -16,8 +17,15 @@ export interface QueueItem {
   entity_name: string;
   submitted_at: string;
   entered_queue_at?: string;
+  due_at?: string;
+  sla_status?: "ON_TRACK" | "NEARING_DUE" | "OVERDUE";
   transaction_count?: number;
   total_amount?: number;
+  subject?: string;
+  assigned_to?: string;
+  age?: string;
+  risk_level?: "high" | "medium" | "low";
+  status?: string;
 }
 
 export interface QueueResponse {
@@ -28,32 +36,46 @@ export interface QueueResponse {
   total_pages: number;
 }
 
-export interface Transaction {
-  id: string | number;
-  date: string;
-  type: string;
-  amount: number | string;
+export interface TransactionResponse {
+  id: string;
+  transaction_date?: string;
+  transaction_amount?: number;
+  account_number?: string;
+  subject_name?: string;
+  subject_id_number?: string;
+  raw_data?: any;
+}
+
+export interface EntityResponse {
+  id: string;
   name: string;
-  details?: string;
+  entity_code: string;
+  entity_type: string;
 }
 
 export interface ReportContentResponse {
-  submission_id: string;
+  id: string;
   reference_number: string;
   report_type: ReportType;
-  submission_method?: string;
-  entity: { id: string; name: string; entity_type?: string };
-  submitted_by: { id: string; username: string };
+  status: string;
   submitted_at: string;
-  metadata?: Record<string, unknown>;
-  transactions: Transaction[];
-  validation_status: string;
-  automated_validation_passed_at?: string;
+  entity?: EntityResponse;
+  transactions: TransactionResponse[];
+}
+
+export interface ReportDetailsResponse {
+  report: ReportContentResponse;
+  validation_result?: any;
+  decision?: any;
+  entity?: EntityResponse;
 }
 
 export interface SubmitDecisionRequest {
-  decision: DecisionType;
+  decision: ManualDecisionType;
   reason?: string;
+  return_reason?: string;
+  rejection_reason?: string;
+  comments?: string;
 }
 
 export interface SubmitDecisionResponse {
