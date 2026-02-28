@@ -96,7 +96,7 @@ export default function ManualValidationQueue() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Inbox className="h-6 w-6" />
-            {pageTitle} ({total} CTRs)
+            {pageTitle} ({total} {effectiveFilters.reportType || "Report"}s)
           </h1>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-2" />

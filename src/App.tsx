@@ -53,8 +53,19 @@ import Resubmissions from "./pages/reporting-entity/Resubmissions";
 import Statistics from "./pages/reporting-entity/Statistics";
 import MyEntityPage from "./pages/reporting-entity/MyEntityPage";
 import ManualValidationQueue from "./pages/compliance/ManualValidationQueue";
+import ManualValidationHistory from "./pages/compliance/ManualValidationHistory";
 import ReportReview from "./pages/compliance/ReportReview";
 import ValidationAuditLogs from "./pages/compliance/ValidationAuditLogs";
+import CTRReviewHistory from "./pages/compliance/CTRReviewHistory";
+import STRManualValidationQueue from "./pages/analysis/STRManualValidationQueue";
+import STRManualValidationHistory from "./pages/analysis/STRManualValidationHistory";
+import STRReviewQueue from "./pages/analysis/STRReviewQueue";
+import STRReviewDetail from "./pages/analysis/STRReviewDetail";
+import STRReviewHistory from "./pages/analysis/STRReviewHistory";
+import STREscalated from "./pages/analysis/STREscalated";
+import CasesPage from "./pages/analysis/CasesPage";
+import IntelligencePage from "./pages/analysis/IntelligencePage";
+import AnalysisAlertsPage from "./pages/analysis/AnalysisAlertsPage";
 import AssignmentQueuePage from "./pages/supervisor/AssignmentQueuePage";
 import TeamWorkloadPage from "./pages/supervisor/TeamWorkloadPage";
 import MyAssignmentsPage from "./pages/my-assignments/MyAssignmentsPage";
@@ -204,7 +215,23 @@ const App = () => (
                 }
               />
               <Route
-                path="/compliance/validation-queue"
+                path="/compliance/manual-validation"
+                element={
+                  <ProtectedRoute requiredRole={["compliance_officer", "head_of_compliance", "super_admin"]}>
+                    <ManualValidationQueue />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/manual-validation/history"
+                element={
+                  <ProtectedRoute requiredRole={["compliance_officer", "head_of_compliance", "super_admin"]}>
+                    <ManualValidationHistory />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/manual-validation/:submissionId"
                 element={
                   <ProtectedRoute
                     requiredRole={[
@@ -215,12 +242,12 @@ const App = () => (
                       "super_admin",
                     ]}
                   >
-                    <ManualValidationQueue />
+                    <ReportReview />
                   </ProtectedRoute>
                 }
               />
               <Route
-                path="/compliance/validation-queue/:submissionId"
+                path="/analysis/manual-validation/:submissionId"
                 element={
                   <ProtectedRoute
                     requiredRole={[
@@ -255,14 +282,8 @@ const App = () => (
                 }
               />
               <Route path="/compliance/ctr-review" element={<CTRReview />} />
-              <Route path="/compliance/ctr-review/all" element={<AllCTRs />} />
-              <Route path="/compliance/ctr-review/overdue" element={<OverdueCTRs />} />
-              <Route path="/compliance/ctr-review/pending" element={<CTRPendingReview />} />
-              <Route path="/compliance/ctr-review/flagged" element={<CTRFlaggedForEscalation />} />
-              <Route path="/compliance/ctr-review/escalated" element={<CTREscalated />} />
-              <Route path="/compliance/ctr-review/archived" element={<CTRArchived />} />
-              <Route path="/compliance/ctr-review/monitoring" element={<CTRUnderMonitoring />} />
               <Route path="/compliance/ctr-review/:reportId/review" element={<CTRReviewDetail />} />
+              <Route path="/compliance/ctr-review/history" element={<CTRReviewHistory />} />
               {/* Legacy routes for backward compatibility */}
               <Route path="/ctr-review" element={<CTRReview />} />
               <Route path="/ctr-review/all" element={<AllCTRs />} />
@@ -316,6 +337,127 @@ const App = () => (
               <Route path="/processing-metrics/entity-performance" element={<EntityPerformance />} />
               {/* Analysis Workspace Routes (f2.md Section 2.3) */}
               <Route path="/analysis-queue" element={<AnalysisQueue />} />
+              <Route
+                path="/analysis/manual-validation"
+                element={
+                  <ProtectedRoute requiredRole={["analyst", "head_of_analysis", "super_admin"]}>
+                    <STRManualValidationQueue />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analysis/manual-validation/history"
+                element={
+                  <ProtectedRoute requiredRole={["analyst", "head_of_analysis", "super_admin"]}>
+                    <STRManualValidationHistory />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analysis/str-review"
+                element={
+                  <ProtectedRoute requiredRole={["analyst", "head_of_analysis", "super_admin"]}>
+                    <STRReviewQueue />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analysis/str-review/:reportId/review"
+                element={
+                  <ProtectedRoute requiredRole={["analyst", "head_of_analysis", "super_admin"]}>
+                    <STRReviewDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analysis/str-review/history"
+                element={
+                  <ProtectedRoute requiredRole={["analyst", "head_of_analysis", "super_admin"]}>
+                    <STRReviewHistory />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analysis/escalated-ctr"
+                element={
+                  <ProtectedRoute requiredRole={["analyst", "head_of_analysis", "super_admin"]}>
+                    <STREscalated />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analysis-alerts"
+                element={
+                  <ProtectedRoute requiredRole={["analyst", "head_of_analysis", "super_admin"]}>
+                    <AnalysisAlertsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cases"
+                element={
+                  <ProtectedRoute requiredRole={["analyst", "head_of_analysis", "super_admin"]}>
+                    <CasesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/intelligence"
+                element={
+                  <ProtectedRoute requiredRole={["analyst", "head_of_analysis", "super_admin"]}>
+                    <IntelligencePage />
+                  </ProtectedRoute>
+                }
+              />
+              {/* Compliance Workspace Routes (f2.md Section 2.2) */}
+              <Route
+                path="/compliance/manual-validation"
+                element={
+                  <ProtectedRoute requiredRole={["compliance_officer", "head_of_compliance", "super_admin"]}>
+                    <ManualValidationQueue />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/manual-validation/history"
+                element={
+                  <ProtectedRoute requiredRole={["compliance_officer", "head_of_compliance", "super_admin"]}>
+                    <ManualValidationHistory />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/ctr-review"
+                element={
+                  <ProtectedRoute requiredRole={["compliance_officer", "head_of_compliance", "super_admin"]}>
+                    <CTRReview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/ctr-review/:reportId/review"
+                element={
+                  <ProtectedRoute requiredRole={["compliance_officer", "head_of_compliance", "super_admin"]}>
+                    <CTRReviewDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/ctr-review/history"
+                element={
+                  <ProtectedRoute requiredRole={["compliance_officer", "head_of_compliance", "super_admin"]}>
+                    <CTRReviewHistory />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/ctr-review/escalated"
+                element={
+                  <ProtectedRoute requiredRole={["compliance_officer", "head_of_compliance", "super_admin"]}>
+                    <CTREscalated />
+                  </ProtectedRoute>
+                }
+              />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Route>

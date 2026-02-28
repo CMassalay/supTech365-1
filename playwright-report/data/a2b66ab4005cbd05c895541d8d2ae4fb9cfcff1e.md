@@ -1,0 +1,109 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "FIA SupTech365" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e8]: FIA
+          - generic [ref=e9]: SupTech365
+        - generic [ref=e11]:
+          - img [ref=e12]
+          - textbox "Search reports, subjects, cases..." [ref=e15]
+          - generic:
+            - generic: ⌘
+            - text: K
+        - generic [ref=e16]:
+          - button "2" [ref=e17] [cursor=pointer]:
+            - img
+            - generic [ref=e18]: "2"
+          - button "C compliance_officer_uat" [ref=e19] [cursor=pointer]:
+            - generic [ref=e21]: C
+            - generic [ref=e23]: compliance_officer_uat
+            - img
+    - generic [ref=e24]:
+      - complementary [ref=e25]:
+        - generic [ref=e26]:
+          - navigation [ref=e27]:
+            - generic [ref=e28]:
+              - generic [ref=e29]: Main
+              - link "Dashboard" [ref=e32] [cursor=pointer]:
+                - /url: /
+                - img [ref=e33]
+                - generic [ref=e36]: Dashboard
+            - generic [ref=e37]:
+              - generic [ref=e38]: Work & Activity
+              - generic [ref=e39]:
+                - link "Validation Queue 8" [ref=e41] [cursor=pointer]:
+                  - /url: /compliance/validation-queue
+                  - img [ref=e42]
+                  - generic [ref=e45]: Validation Queue
+                  - generic [ref=e46]: "8"
+                - link "My Assigned CTRs 15" [ref=e48] [cursor=pointer]:
+                  - /url: /compliance/ctr-review
+                  - img [ref=e49]
+                  - generic [ref=e52]: My Assigned CTRs
+                  - generic [ref=e53]: "15"
+                - link "Flagged CTRs" [ref=e55] [cursor=pointer]:
+                  - /url: /compliance/ctr-review/flagged
+                  - img [ref=e56]
+                  - generic [ref=e58]: Flagged CTRs
+          - generic [ref=e59]:
+            - link "Help & Support" [ref=e60] [cursor=pointer]:
+              - /url: /help
+              - img [ref=e61]
+              - generic [ref=e64]: Help & Support
+            - button "Collapse" [ref=e65] [cursor=pointer]:
+              - img [ref=e66]
+              - generic [ref=e68]: Collapse
+      - main [ref=e69]:
+        - generic [ref=e70]:
+          - navigation [ref=e71]:
+            - list [ref=e72]:
+              - listitem [ref=e73]:
+                - link "Compliance" [ref=e74] [cursor=pointer]:
+                  - /url: /compliance/validation
+                  - generic [ref=e75]: Compliance
+              - listitem [ref=e76]:
+                - img [ref=e77]
+                - generic [ref=e80]: Validation Audit Logs
+          - heading "Validation Audit Logs" [level=1] [ref=e81]:
+            - img [ref=e82]
+            - text: Validation Audit Logs
+          - generic [ref=e85]:
+            - generic [ref=e86]:
+              - combobox [ref=e87] [cursor=pointer]:
+                - generic: All Decisions
+                - img [ref=e88]
+              - textbox [ref=e90]
+              - textbox [ref=e91]
+              - textbox "Search by reference..." [ref=e92]
+              - textbox "Filter by user..." [ref=e93]
+              - button "Export CSV" [ref=e94] [cursor=pointer]:
+                - img
+                - text: Export CSV
+              - button "Reset" [ref=e95] [cursor=pointer]
+            - generic [ref=e96]: Loading audit logs...
+            - generic [ref=e97]:
+              - paragraph [ref=e98]: Showing 0-0 of 0
+              - navigation "pagination" [ref=e99]:
+                - list [ref=e100]:
+                  - listitem [ref=e101]:
+                    - link "Go to previous page" [ref=e102] [cursor=pointer]:
+                      - /url: "#"
+                      - img
+                      - generic [ref=e103]: Previous
+                  - listitem [ref=e104]:
+                    - link "1" [ref=e105] [cursor=pointer]:
+                      - /url: "#"
+                  - listitem [ref=e106]:
+                    - link "Go to next page" [ref=e107] [cursor=pointer]:
+                      - /url: "#"
+                      - generic [ref=e108]: Next
+                      - img
+```

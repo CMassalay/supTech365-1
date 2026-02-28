@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { FileCheck, RefreshCw, UserPlus, AlertTriangle } from "lucide-react";
+import { FileCheck, RefreshCw, UserPlus, AlertTriangle, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,88 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-interface UnassignedValidation {
-  id: string;
-  referenceNumber: string;
-  type: "CTR" | "STR";
-  entityName: string;
-  transactionCount: number;
-  submittedDate: string;
-  age: string;
-  overdue?: boolean;
-}
-
-interface AssignedValidation {
-  id: string;
-  referenceNumber: string;
-  type: "CTR" | "STR";
-  entityName: string;
-  currentAssignee: string;
-  status: "Pending" | "In Progress";
-  age: string;
-}
-
-const mockUnassigned: UnassignedValidation[] = [
-  {
-    id: "FIA-2026-0231",
-    referenceNumber: "FIA-2026-0231",
-    type: "CTR",
-    entityName: "UBA Liberia",
-    transactionCount: 5,
-    submittedDate: "2026-01-17",
-    age: "4d",
-    overdue: true,
-  },
-  {
-    id: "FIA-2026-0235",
-    referenceNumber: "FIA-2026-0235",
-    type: "CTR",
-    entityName: "Liberia Bank",
-    transactionCount: 12,
-    submittedDate: "2026-01-20",
-    age: "1d",
-  },
-  {
-    id: "FIA-2026-0236",
-    referenceNumber: "FIA-2026-0236",
-    type: "STR",
-    entityName: "ABC Microfinance",
-    transactionCount: 3,
-    submittedDate: "2026-01-20",
-    age: "1d",
-  },
-];
-
-const mockAssigned: AssignedValidation[] = [
-  {
-    id: "FIA-2026-0234",
-    referenceNumber: "FIA-2026-0234",
-    type: "CTR",
-    entityName: "Bank of Monrovia",
-    currentAssignee: "Jane Doe",
-    status: "Pending",
-    age: "1d",
-  },
-  {
-    id: "FIA-2026-0233",
-    referenceNumber: "FIA-2026-0233",
-    type: "CTR",
-    entityName: "First Intl Bank",
-    currentAssignee: "John Smith",
-    status: "Pending",
-    age: "2d",
-  },
-  {
-    id: "FIA-2026-0232",
-    referenceNumber: "FIA-2026-0232",
-    type: "CTR",
-    entityName: "Ecobank Liberia",
-    currentAssignee: "Mary J.",
-    status: "Pending",
-    age: "3d",
-  },
-];
+import { useValidationQueue } from "@/hooks/useManualValidation";
+import { useTeamWorkload } from "@/hooks/useTeamWorkload";
+import { differenceInDays } from "date-fns";
 
 type IntakeTab = "unassigned" | "assigned";
 
@@ -107,31 +28,24 @@ export default function ValidationIntakeAssignment() {
   const [query, setQuery] = useState("");
   const [selectedUnassigned, setSelectedUnassigned] = useState<string[]>([]);
   const [selectedAssigned, setSelectedAssigned] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
+  const { data: unassignedData, isLoading: unassignedLoading, refetch: refetchUnassigned } = useValidationQueue({
+    validationStatus: "PENDING"
+  }, page, pageSize);
+
+  const { data: assignedData, isLoading: assignedLoading, refetch: refetchAssigned } = useValidationQueue({
+    validationStatus: "IN_REVIEW"
+  }, page, pageSize);
+
+  const { data: teamData, isLoading: teamLoading } = useTeamWorkload();
 
   const breadcrumbItems = [
     { label: "Compliance Workspace", icon: <FileCheck className="h-5 w-5" /> },
     { label: "Validation Queue", link: "/compliance/validation" },
     { label: "Intake & Assignment" },
   ];
-
-  const filteredUnassigned = useMemo(() => {
-    if (!query.trim()) return mockUnassigned;
-    const q = query.toLowerCase();
-    return mockUnassigned.filter(v =>
-      v.referenceNumber.toLowerCase().includes(q) ||
-      v.entityName.toLowerCase().includes(q)
-    );
-  }, [query]);
-
-  const filteredAssigned = useMemo(() => {
-    if (!query.trim()) return mockAssigned;
-    const q = query.toLowerCase();
-    return mockAssigned.filter(v =>
-      v.referenceNumber.toLowerCase().includes(q) ||
-      v.entityName.toLowerCase().includes(q) ||
-      v.currentAssignee.toLowerCase().includes(q)
-    );
-  }, [query]);
 
   return (
     <MainLayout>
@@ -142,7 +56,7 @@ export default function ValidationIntakeAssignment() {
             <FileCheck className="h-6 w-6 text-primary" />
             Validation Intake &amp; Assignment
           </h1>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => { refetchUnassigned(); refetchAssigned(); }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -150,22 +64,13 @@ export default function ValidationIntakeAssignment() {
 
         {/* Tabs + shared filters/search */}
         <div className="flex flex-col gap-4">
-          <Tabs value={tab} onValueChange={(v) => setTab(v as IntakeTab)}>
+          <Tabs value={tab} onValueChange={(v) => { setTab(v as IntakeTab); setPage(1); }}>
             <TabsList>
-              <TabsTrigger value="unassigned">Unassigned ({mockUnassigned.length})</TabsTrigger>
-              <TabsTrigger value="assigned">Assigned / Reassign ({mockAssigned.length})</TabsTrigger>
+              <TabsTrigger value="unassigned">Unassigned ({unassignedData?.total || 0})</TabsTrigger>
+              <TabsTrigger value="assigned">Assigned / Reassign ({assignedData?.total || 0})</TabsTrigger>
             </TabsList>
 
             <div className="mt-4 flex gap-2 flex-wrap items-center">
-              <Select defaultValue={tab === "unassigned" ? "unassigned" : "assigned"} disabled>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  <SelectItem value="assigned">Assigned</SelectItem>
-                </SelectContent>
-              </Select>
               <Select defaultValue="all">
                 <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Report Type" />
@@ -182,19 +87,6 @@ export default function ValidationIntakeAssignment() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Entities</SelectItem>
-                  <SelectItem value="bank_of_monrovia">Bank of Monrovia</SelectItem>
-                  <SelectItem value="uba">UBA Liberia</SelectItem>
-                  <SelectItem value="ecobank">Ecobank Liberia</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select defaultValue="all">
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Date Range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Dates</SelectItem>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
                 </SelectContent>
               </Select>
               <Button variant="ghost" size="sm" onClick={() => setQuery("")}>
@@ -216,59 +108,73 @@ export default function ValidationIntakeAssignment() {
                   <CardTitle>Unassigned Pool</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="data-table-header">
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={selectedUnassigned.length > 0 && selectedUnassigned.length === filteredUnassigned.length}
-                            onCheckedChange={(checked) => {
-                              if (checked) setSelectedUnassigned(filteredUnassigned.map(v => v.id));
-                              else setSelectedUnassigned([]);
-                            }}
-                          />
-                        </TableHead>
-                        <TableHead>Ref #</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Entity</TableHead>
-                        <TableHead>Trans</TableHead>
-                        <TableHead>Submitted</TableHead>
-                        <TableHead>Age</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUnassigned.map((v) => (
-                        <TableRow key={v.id} className="data-table-row">
-                          <TableCell>
+                  {unassignedLoading ? (
+                    <div className="p-12 text-center">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="data-table-header">
+                          <TableHead className="w-12">
                             <Checkbox
-                              checked={selectedUnassigned.includes(v.id)}
+                              checked={selectedUnassigned.length > 0 && selectedUnassigned.length === (unassignedData?.items.length || 0)}
                               onCheckedChange={(checked) => {
-                                if (checked) setSelectedUnassigned([...selectedUnassigned, v.id]);
-                                else setSelectedUnassigned(selectedUnassigned.filter(id => id !== v.id));
+                                if (checked) setSelectedUnassigned(unassignedData?.items.map(v => v.submission_id) || []);
+                                else setSelectedUnassigned([]);
                               }}
                             />
-                          </TableCell>
-                          <TableCell className="font-mono font-medium text-primary">{v.referenceNumber}</TableCell>
-                          <TableCell>
-                            <ReportTypeBadge type={v.type} />
-                          </TableCell>
-                          <TableCell>{v.entityName}</TableCell>
-                          <TableCell>{v.transactionCount}</TableCell>
-                          <TableCell className="text-muted-foreground">{v.submittedDate}</TableCell>
-                          <TableCell className={`inline-flex items-center gap-1 ${v.overdue ? "text-destructive font-medium" : ""}`}>
-                            {v.age}{v.overdue ? <AlertTriangle className="h-4 w-4 shrink-0" /> : ""}
-                          </TableCell>
+                          </TableHead>
+                          <TableHead>Ref #</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Entity</TableHead>
+                          <TableHead>Trans</TableHead>
+                          <TableHead>Submitted</TableHead>
+                          <TableHead>Age</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {unassignedData?.items.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="h-24 text-center">
+                              No unassigned reports found.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          unassignedData?.items.map((v) => (
+                            <TableRow key={v.submission_id} className="data-table-row">
+                              <TableCell>
+                                <Checkbox
+                                  checked={selectedUnassigned.includes(v.submission_id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) setSelectedUnassigned([...selectedUnassigned, v.submission_id]);
+                                    else setSelectedUnassigned(selectedUnassigned.filter(id => id !== v.submission_id));
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell className="font-mono font-medium text-primary">{v.reference_number}</TableCell>
+                              <TableCell>
+                                <ReportTypeBadge type={v.report_type as any} />
+                              </TableCell>
+                              <TableCell>{v.entity_name}</TableCell>
+                              <TableCell>{v.transaction_count}</TableCell>
+                              <TableCell className="text-muted-foreground">{v.submitted_at}</TableCell>
+                              <TableCell>
+                                {differenceInDays(new Date(), new Date(v.submitted_at))}d
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
 
                   <div className="flex items-center justify-between">
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setSelectedUnassigned(filteredUnassigned.map(v => v.id))}
+                        onClick={() => setSelectedUnassigned(unassignedData?.items.map(v => v.submission_id) || [])}
                       >
                         Select All
                       </Button>
@@ -282,12 +188,14 @@ export default function ValidationIntakeAssignment() {
                           <SelectValue placeholder="Assign to" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="jane">Jane Doe</SelectItem>
-                          <SelectItem value="john">John Smith</SelectItem>
-                          <SelectItem value="mary">Mary Johnson</SelectItem>
+                          {teamData?.map(officer => (
+                            <SelectItem key={officer.user_id} value={officer.user_id}>
+                              {officer.user_name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
-                      <Input type="date" className="w-[160px]" defaultValue="2026-01-25" />
+                      <Input type="date" className="w-[160px]" defaultValue={new Date().toISOString().split('T')[0]} />
                       <Button size="sm" disabled={selectedUnassigned.length === 0}>
                         <UserPlus className="h-4 w-4 mr-2" />
                         Assign Selected
@@ -304,61 +212,75 @@ export default function ValidationIntakeAssignment() {
                   <CardTitle>Assigned / Reassign</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="data-table-header">
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={selectedAssigned.length > 0 && selectedAssigned.length === filteredAssigned.length}
-                            onCheckedChange={(checked) => {
-                              if (checked) setSelectedAssigned(filteredAssigned.map(v => v.id));
-                              else setSelectedAssigned([]);
-                            }}
-                          />
-                        </TableHead>
-                        <TableHead>Ref #</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Entity</TableHead>
-                        <TableHead>Current Assignee</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Age</TableHead>
-                        <TableHead>Reason</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAssigned.map((v) => (
-                        <TableRow key={v.id} className="data-table-row">
-                          <TableCell>
+                  {assignedLoading ? (
+                    <div className="p-12 text-center">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="data-table-header">
+                          <TableHead className="w-12">
                             <Checkbox
-                              checked={selectedAssigned.includes(v.id)}
+                              checked={selectedAssigned.length > 0 && selectedAssigned.length === (assignedData?.items.length || 0)}
                               onCheckedChange={(checked) => {
-                                if (checked) setSelectedAssigned([...selectedAssigned, v.id]);
-                                else setSelectedAssigned(selectedAssigned.filter(id => id !== v.id));
+                                if (checked) setSelectedAssigned(assignedData?.items.map(v => v.submission_id) || []);
+                                else setSelectedAssigned([]);
                               }}
                             />
-                          </TableCell>
-                          <TableCell className="font-mono font-medium text-primary">{v.referenceNumber}</TableCell>
-                          <TableCell>
-                            <ReportTypeBadge type={v.type} />
-                          </TableCell>
-                          <TableCell>{v.entityName}</TableCell>
-                          <TableCell>{v.currentAssignee}</TableCell>
-                          <TableCell>{v.status}</TableCell>
-                          <TableCell>{v.age}</TableCell>
-                          <TableCell>
-                            <Input placeholder="Enter reason..." className="w-[220px]" />
-                          </TableCell>
+                          </TableHead>
+                          <TableHead>Ref #</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Entity</TableHead>
+                          <TableHead>Current Assignee</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Age</TableHead>
+                          <TableHead>Reason</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {assignedData?.items.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="h-24 text-center">
+                              No assigned reports found.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          assignedData?.items.map((v) => (
+                            <TableRow key={v.submission_id} className="data-table-row">
+                              <TableCell>
+                                <Checkbox
+                                  checked={selectedAssigned.includes(v.submission_id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) setSelectedAssigned([...selectedAssigned, v.submission_id]);
+                                    else setSelectedAssigned(selectedAssigned.filter(id => id !== v.submission_id));
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell className="font-mono font-medium text-primary">{v.reference_number}</TableCell>
+                              <TableCell>
+                                <ReportTypeBadge type={v.report_type as any} />
+                              </TableCell>
+                              <TableCell>{v.entity_name}</TableCell>
+                              <TableCell>{v.assigned_to_name || "Unassigned"}</TableCell>
+                              <TableCell>{v.validation_status}</TableCell>
+                              <TableCell>{differenceInDays(new Date(), new Date(v.submitted_at))}d</TableCell>
+                              <TableCell>
+                                <Input placeholder="Enter reason..." className="w-[220px]" />
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
 
                   <div className="flex items-center justify-between">
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setSelectedAssigned(filteredAssigned.map(v => v.id))}
+                        onClick={() => setSelectedAssigned(assignedData?.items.map(v => v.submission_id) || [])}
                       >
                         Select All
                       </Button>
@@ -372,9 +294,11 @@ export default function ValidationIntakeAssignment() {
                           <SelectValue placeholder="Reassign to" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="jane">Jane Doe</SelectItem>
-                          <SelectItem value="john">John Smith</SelectItem>
-                          <SelectItem value="mary">Mary Johnson</SelectItem>
+                          {teamData?.map(officer => (
+                            <SelectItem key={officer.user_id} value={officer.user_id}>
+                              {officer.user_name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <Button size="sm" disabled={selectedAssigned.length === 0}>

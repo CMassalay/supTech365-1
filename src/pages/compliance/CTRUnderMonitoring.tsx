@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { Eye, RefreshCw } from "lucide-react";
+import { Eye, RefreshCw, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -12,61 +13,38 @@ import {
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-
-interface MonitoringCTR {
-  id: string;
-  referenceNumber: string;
-  entityName: string;
-  amount: string;
-  transactionCount: number;
-  subject: string;
-  monitorStart: string;
-  plan: string;
-  status: string;
-}
-
-const mockMonitoringCTRs: MonitoringCTR[] = [
-  {
-    id: "1",
-    referenceNumber: "FIA-0205",
-    entityName: "Bank of M.",
-    amount: "$25,500",
-    transactionCount: 5,
-    subject: "ABC Corp",
-    monitorStart: "Jan 10",
-    plan: "90d",
-    status: "Active",
-  },
-  {
-    id: "2",
-    referenceNumber: "FIA-0202",
-    entityName: "First Intl",
-    amount: "$18,900",
-    transactionCount: 3,
-    subject: "John M.",
-    monitorStart: "Jan 8",
-    plan: "60d",
-    status: "Active",
-  },
-  {
-    id: "3",
-    referenceNumber: "FIA-0198",
-    entityName: "Ecobank",
-    amount: "$22,300",
-    transactionCount: 4,
-    subject: "Sarah K.",
-    monitorStart: "Jan 5",
-    plan: "30d",
-    status: "Active",
-  },
-];
+import { useMonitoredReports } from "@/hooks/useReviewQueue";
+import { format } from "date-fns";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 export default function CTRUnderMonitoring() {
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
+  const { data, isLoading, error, refetch } = useMonitoredReports(page, pageSize, { report_type: "CTR" });
+
   const breadcrumbItems = [
     { label: "Compliance Workspace", icon: <Eye className="h-5 w-5" /> },
     { label: "CTR Review Queue", link: "/compliance/ctr-review" },
     { label: "Under Monitoring" },
   ];
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="p-6">
+          <Card className="border-destructive">
+            <CardContent className="p-6 text-center">
+              <p className="text-destructive font-medium">Failed to load monitored reports</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -75,10 +53,10 @@ export default function CTRUnderMonitoring() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Eye className="h-6 w-6 text-primary" />
-            CTRs Under Monitoring (10 items)
+            CTRs Under Monitoring ({data?.total || 0} items)
           </h1>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Refresh
           </Button>
         </div>
@@ -99,7 +77,6 @@ export default function CTRUnderMonitoring() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Entities</SelectItem>
-              <SelectItem value="bom">Bank of Monrovia</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="ghost" size="sm">Clear</Button>
@@ -107,40 +84,85 @@ export default function CTRUnderMonitoring() {
 
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="data-table-header">
-                  <TableHead>Ref #</TableHead>
-                  <TableHead>Entity</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Trans</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Monitor Start</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockMonitoringCTRs.map((ctr) => (
-                  <TableRow key={ctr.id} className="data-table-row">
-                    <TableCell className="font-mono font-medium text-primary">
-                      {ctr.referenceNumber}
-                    </TableCell>
-                    <TableCell>{ctr.entityName}</TableCell>
-                    <TableCell className="font-medium">{ctr.amount}</TableCell>
-                    <TableCell>{ctr.transactionCount}</TableCell>
-                    <TableCell>{ctr.subject}</TableCell>
-                    <TableCell className="text-muted-foreground">{ctr.monitorStart}</TableCell>
-                    <TableCell>{ctr.plan}</TableCell>
-                    <TableCell>
-                      <span className="text-sm">{ctr.status}</span>
-                    </TableCell>
+            {isLoading ? (
+              <div className="p-12 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                <p className="mt-4 text-muted-foreground">Loading monitored reports...</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="data-table-header">
+                    <TableHead>Ref #</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Trans</TableHead>
+                    <TableHead>Monitor Start</TableHead>
+                    <TableHead>Assigned To</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {data?.items.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        No reports under monitoring found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    data?.items.map((ctr) => (
+                      <TableRow key={ctr.submission_id} className="data-table-row">
+                        <TableCell className="font-mono font-medium text-primary">
+                          {ctr.reference_number}
+                        </TableCell>
+                        <TableCell>{ctr.report_type}</TableCell>
+                        <TableCell className="font-medium">${ctr.total_amount.toLocaleString()}</TableCell>
+                        <TableCell>{ctr.transaction_count}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {format(new Date(ctr.submitted_at), "MMM dd")}
+                        </TableCell>
+                        <TableCell>{ctr.assigned_to_name || "Unassigned"}</TableCell>
+                        <TableCell>
+                          <span className="text-sm">Monitored</span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
+
+        {data && data.total_pages > 1 && (
+          <Pagination className="mt-4">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              {Array.from({ length: data.total_pages }, (_, i) => i + 1).map((p) => (
+                <PaginationItem key={p}>
+                  <PaginationLink 
+                    onClick={() => setPage(p)}
+                    isActive={page === p}
+                    className="cursor-pointer"
+                  >
+                    {p}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setPage(p => Math.min(data.total_pages, p + 1))}
+                  className={page === data.total_pages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
 
         <Card>
           <CardContent className="p-4">

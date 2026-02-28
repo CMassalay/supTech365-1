@@ -67,8 +67,8 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
           label: "Reporting",
           items: [
             { title: "Submit Report", href: "/submit", icon: Upload },
-            { title: "My Submissions", href: "/submissions", icon: FileText, badge: 12 },
-            { title: "Resubmissions", href: "/resubmissions", icon: RotateCcw, badge: 2, badgeVariant: "warning" },
+            { title: "My Submissions", href: "/submissions", icon: FileText },
+            { title: "Resubmissions", href: "/resubmissions", icon: RotateCcw },
             { title: "Statistics", href: "/statistics", icon: BarChart3 },
             { title: "My Entity", href: "/my-entity", icon: Building2 },
             { title: "API Credentials", href: "/api-credentials", icon: Key },
@@ -87,11 +87,13 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
     case "compliance_officer":
       return withHome([
         {
-          label: "Work & Activity",
+          label: "Compliance",
           items: [
-            { title: "Validation Queue", href: "/compliance/validation-queue", icon: Inbox, badge: 8 },
-            { title: "My Assigned CTRs", href: "/compliance/ctr-review", icon: FileText, badge: 15 },
-            { title: "Flagged CTRs", href: "/compliance/ctr-review/flagged", icon: Flag },
+            { title: "Manual Validation", href: "/compliance/manual-validation", icon: Inbox },
+            { title: "Manual Validation History", href: "/compliance/manual-validation/history", icon: Clock },
+            { title: "CTR Review", href: "/compliance/ctr-review", icon: FileText },
+            { title: "CTR Review History", href: "/compliance/ctr-review/history", icon: Clock },
+            { title: "Escalated CTR", href: "/compliance/ctr-review/escalated", icon: AlertTriangle },
           ],
         },
       ]);
@@ -100,8 +102,8 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
         {
           label: "Management",
           items: [
-            { title: "CTR Management Hub", href: "/compliance/validation/all", icon: FileText, badge: 15 },
-            { title: "Escalations", href: "/compliance/escalation/pending", icon: TrendingUp, badge: 4, badgeVariant: "warning" as const },
+            { title: "CTR/STR Management Hub", href: "/compliance/validation/all", icon: FileText },
+            { title: "Escalations", href: "/compliance/escalation/pending", icon: TrendingUp },
             { title: "Team Workload", href: "/supervisor/workload", icon: Users },
             { title: "System Audit Logs", href: "/audit", icon: Shield },
           ],
@@ -110,18 +112,16 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
     case "analyst":
       return withHome([
         {
-          label: "Analysis",
+          label: "STR Analysis",
           items: [
-            { title: "My Assignments", href: "/my-assignments", icon: ClipboardList },
-            { title: "My Validation Queue", href: "/compliance/validation-queue", icon: Inbox, badge: 6 },
+            { title: "Manual Validation", href: "/analysis/manual-validation", icon: Inbox },
+            { title: "Manual Validation History", href: "/analysis/manual-validation/history", icon: Clock },
+            { title: "STR Review", href: "/analysis/str-review", icon: FileText },
+            { title: "STR Review History", href: "/analysis/str-review/history", icon: Clock },
+            { title: "Escalated CTR", href: "/analysis/escalated-ctr", icon: AlertTriangle },
             { title: "Subject Profiles", href: "/subjects", icon: Users },
-            { title: "Alerts", href: "/analysis-alerts", icon: AlertTriangle, badge: 2, badgeVariant: "critical" },
-          ],
-        },
-        {
-          label: "Cases",
-          items: [
-            { title: "My Cases", href: "/cases", icon: FolderOpen, badge: 4 },
+            { title: "Alerts", href: "/analysis-alerts", icon: AlertTriangle },
+            { title: "My Cases", href: "/cases", icon: FolderOpen },
             { title: "Intelligence", href: "/intelligence", icon: Send },
           ],
         },
@@ -131,16 +131,16 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
         {
           label: "Analysis",
           items: [
-            { title: "Manual Validation Queue", href: "/compliance/validation-queue", icon: Inbox, badge: 6 },
-            { title: "My Queue", href: "/analysis-queue", icon: ClipboardList, badge: 6 },
+            { title: "Manual Validation Queue", href: "/compliance/validation-queue", icon: Inbox },
+            { title: "My Queue", href: "/analysis-queue", icon: ClipboardList },
             { title: "Subject Profiles", href: "/subjects", icon: Users },
-            { title: "Alerts", href: "/analysis-alerts", icon: AlertTriangle, badge: 2, badgeVariant: "critical" },
+            { title: "Alerts", href: "/analysis-alerts", icon: AlertTriangle },
           ],
         },
         {
           label: "Cases",
           items: [
-            { title: "My Cases", href: "/cases", icon: FolderOpen, badge: 4 },
+            { title: "My Cases", href: "/cases", icon: FolderOpen },
             { title: "Intelligence", href: "/intelligence", icon: Send },
           ],
         },
@@ -159,9 +159,9 @@ export const getNavigationByRole = (role: UserRole): NavSection[] => {
           label: "Oversight",
           items: [
             { title: "Dashboards", href: "/dashboards", icon: BarChart3 },
-            { title: "Validation Queue", href: "/compliance/validation", icon: FileCheck, badge: 8 },
+            { title: "Validation Queue", href: "/compliance/validation", icon: FileCheck },
             { title: "Cases", href: "/all-cases", icon: FolderOpen },
-            { title: "Dissemination", href: "/dissemination", icon: Send, badge: 3 },
+            { title: "Dissemination", href: "/dissemination", icon: Send },
           ],
         },
         {

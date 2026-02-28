@@ -1,16 +1,32 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { TrendingUp, CheckCircle2 } from "lucide-react";
+import { TrendingUp, CheckCircle2, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useDashboardStatistics, useEscalationMetrics } from "@/hooks/useDashboard";
 
 export default function EscalationRateTrends() {
+  const { data: stats, isLoading: statsLoading } = useDashboardStatistics();
+  const { data: escalationMetrics, isLoading: metricsLoading } = useEscalationMetrics();
+
   const breadcrumbItems = [
     { label: "Compliance Workspace", icon: <TrendingUp className="h-5 w-5" /> },
     { label: "Dashboards", link: "/compliance/dashboards/processing" },
     { label: "Escalation Rate Trends" },
   ];
+
+  if (statsLoading || metricsLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const kpis = stats?.kpis || {};
 
   return (
     <MainLayout>
@@ -40,16 +56,16 @@ export default function EscalationRateTrends() {
           <CardContent>
             <div className="grid grid-cols-4 gap-4">
               <div>
-                <div className="text-sm text-muted-foreground">Total CTRs</div>
-                <div className="text-3xl font-bold mt-1">450</div>
+                <div className="text-sm text-muted-foreground">Total Reports</div>
+                <div className="text-3xl font-bold mt-1">{kpis.reports_in_queue + kpis.open_cases || 0}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Escalated</div>
-                <div className="text-3xl font-bold mt-1">36 (8%)</div>
+                <div className="text-3xl font-bold mt-1">{kpis.open_cases || 0}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Escalation Rate</div>
-                <div className="text-3xl font-bold mt-1">8%</div>
+                <div className="text-3xl font-bold mt-1">{kpis.escalation_rate || "0%"}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Target Range</div>
@@ -79,7 +95,7 @@ export default function EscalationRateTrends() {
               ))}
             </div>
             <div className="mt-4 text-center text-sm text-muted-foreground">
-              ← Target Range (5-10%)
+              Trend based on real-time data
             </div>
           </CardContent>
         </Card>
@@ -90,39 +106,10 @@ export default function EscalationRateTrends() {
           </CardHeader>
           <CardContent className="space-y-2">
             <div>
-              <span className="font-medium">Total Flagged:</span> 45 (10% of CTRs)
+              <span className="font-medium">Monthly Summary:</span> {escalationMetrics?.this_month}
             </div>
             <div>
-              <span className="font-medium">• Approved:</span> 36 (80% of flagged, 8% of CTRs)
-            </div>
-            <div>
-              <span className="font-medium">• Rejected:</span> 9 (20% of flagged, 2% of CTRs)
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Escalation Quality Metrics</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span>Escalations → Cases Opened:</span>
-              <span className="font-medium">26/36 (72%)</span>
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span>Escalations → Intelligence Disseminated:</span>
-              <span className="font-medium">18/36 (50%)</span>
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-            </div>
-            <div>
-              <span>Escalations → Closed Without Action:</span>
-              <span className="font-medium">10/36 (28%)</span>
-            </div>
-            <div className="pt-2 border-t">
-              <span className="font-medium">Quality Score:</span> 83% (Target: 70%+)
-              <CheckCircle2 className="h-4 w-4 text-green-600 ml-2 inline" />
+              <span className="font-medium">Quality Score:</span> {escalationMetrics?.quality_score}
             </div>
           </CardContent>
         </Card>

@@ -11,31 +11,55 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertCircle, ArrowLeft, Download, Upload } from "lucide-react";
-
-const mockErrors = [
-  { id: 1, field: "Transaction Date", error: "Missing mandatory field", row: "Row 3" },
-  { id: 2, field: "Amount", error: "Invalid numeric format", row: "Row 5" },
-  { id: 3, field: "Date of Birth", error: "Invalid date format", row: "Row 7" },
-];
+import { AlertCircle, ArrowLeft, Download, Upload, Loader2 } from "lucide-react";
+import { useValidationResult, useValidationErrors } from "@/hooks/useValidation";
+import { format } from "date-fns";
 
 export default function ValidationErrorReport() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  
+  const { data: result, isLoading: resultLoading, error: resultError } = useValidationResult(id || "");
+  const { data: errors, isLoading: errorsLoading } = useValidationErrors(id || "");
+
   const breadcrumbItems = [
     { label: "Reporting", href: "/submissions" },
     { label: "Submission", href: `/submissions/${id}` },
     { label: "Validation Error Report", href: "#" },
   ];
 
-  const referenceNumber = `REF-2026-${String(id).padStart(5, "0")}`;
-  const reportType = "STR";
-  const submittedAt = "2026-02-05 15:45:00";
-
   const handleDownload = () => {
     // In real app: generate CSV/PDF of errors
     window.open("#", "_blank");
   };
+
+  if (resultLoading || errorsLoading) {
+    return (
+      <MainLayout>
+        <div className="p-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="mt-4 text-muted-foreground">Loading error report...</p>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (resultError || !result) {
+    return (
+      <MainLayout>
+        <div className="p-6">
+          <Card className="border-destructive">
+            <CardContent className="p-6 text-center">
+              <p className="text-destructive font-medium">Failed to load error report</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate("/submissions")}>
+                Back to Submissions
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -50,9 +74,9 @@ export default function ValidationErrorReport() {
           <CardHeader>
             <h1 className="text-2xl font-bold">Validation Error Report</h1>
             <div className="text-sm text-muted-foreground space-y-1 mt-2">
-              <p><strong>Reference:</strong> {referenceNumber}</p>
-              <p><strong>Report Type:</strong> {reportType}</p>
-              <p><strong>Submitted:</strong> {submittedAt}</p>
+              <p><strong>Reference:</strong> {result.reference_number}</p>
+              <p><strong>Report Type:</strong> {result.report_type}</p>
+              <p><strong>Submitted:</strong> {format(new Date(result.submitted_at), "yyyy-MM-dd HH:mm:ss")}</p>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -61,13 +85,13 @@ export default function ValidationErrorReport() {
               <div>
                 <p className="font-semibold text-red-800">Validation failed</p>
                 <p className="text-sm text-red-700 mt-1">
-                  {mockErrors.length} error(s) found. Please fix and resubmit.
+                  {errors?.length || 0} error(s) found. Please fix and resubmit.
                 </p>
               </div>
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold mb-3">Errors ({mockErrors.length})</h2>
+              <h2 className="text-lg font-semibold mb-3">Errors ({errors?.length || 0})</h2>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -78,14 +102,22 @@ export default function ValidationErrorReport() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockErrors.map((e, i) => (
-                    <TableRow key={e.id}>
-                      <TableCell>{i + 1}</TableCell>
-                      <TableCell>{e.field}</TableCell>
-                      <TableCell>{e.error}</TableCell>
-                      <TableCell>{e.row}</TableCell>
+                  {errors && errors.length > 0 ? (
+                    errors.map((e, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{i + 1}</TableCell>
+                        <TableCell className="font-medium">{e.field}</TableCell>
+                        <TableCell className="text-destructive">{e.message}</TableCell>
+                        <TableCell>{e.row || "N/A"}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-24 text-center">
+                        No detailed errors found.
+                      </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>

@@ -109,13 +109,13 @@ export interface SubmitReviewDecisionRequest {
   escalation_reason?: string;
 }
 
-export async function fetchReviewQueue(page = 1, pageSize = 20): Promise<ReviewQueueResponse> {
+export async function fetchReviewQueue(page = 1, pageSize = 20, filters: { report_type?: string } = {}): Promise<ReviewQueueResponse> {
   return request<ReviewQueueResponse>("/api/v1/review/queue", {
     method: "GET",
     query: {
       page,
       page_size: pageSize,
-      report_type: "CTR",
+      report_type: filters.report_type || "CTR",
     },
   });
 }
@@ -140,5 +140,83 @@ export async function submitCTRReviewDecision(
   return request(`/api/v1/review/reports/${encodeURIComponent(submissionId)}/decision`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchReviewHistory(page = 1, pageSize = 20, filters: { report_type?: string } = {}): Promise<ReviewQueueResponse> {
+  return request<ReviewQueueResponse>("/api/v1/review/history", {
+    method: "GET",
+    query: {
+      page,
+      page_size: pageSize,
+      report_type: filters.report_type || "CTR",
+    },
+  });
+}
+
+export async function fetchEscalatedReports(page = 1, pageSize = 20, filters: { report_type?: string } = {}): Promise<ReviewQueueResponse> {
+  return request<ReviewQueueResponse>("/api/v1/review/escalated", {
+    method: "GET",
+    query: {
+      page,
+      page_size: pageSize,
+      report_type: filters.report_type,
+    },
+  });
+}
+
+export async function fetchFlaggedReports(page = 1, pageSize = 20, filters: { report_type?: string } = {}): Promise<ReviewQueueResponse> {
+  return request<ReviewQueueResponse>("/api/v1/review/flagged", {
+    method: "GET",
+    query: {
+      page,
+      page_size: pageSize,
+      report_type: filters.report_type,
+    },
+  });
+}
+
+export async function fetchMonitoredReports(page = 1, pageSize = 20, filters: { report_type?: string } = {}): Promise<ReviewQueueResponse> {
+  return request<ReviewQueueResponse>("/api/v1/review/monitored", {
+    method: "GET",
+    query: {
+      page,
+      page_size: pageSize,
+      report_type: filters.report_type,
+    },
+  });
+}
+
+export async function fetchArchivedReports(page = 1, pageSize = 20, filters: { report_type?: string } = {}): Promise<ReviewQueueResponse> {
+  return request<ReviewQueueResponse>("/api/v1/review/archived", {
+    method: "GET",
+    query: {
+      page,
+      page_size: pageSize,
+      report_type: filters.report_type,
+    },
+  });
+}
+
+export async function fetchOverdueReports(page = 1, pageSize = 20, filters: { report_type?: string } = {}): Promise<ReviewQueueResponse> {
+  return request<ReviewQueueResponse>("/api/v1/review/overdue", {
+    method: "GET",
+    query: {
+      page,
+      page_size: pageSize,
+      report_type: filters.report_type,
+    },
+  });
+}
+
+export async function fetchAllReviewReports(page = 1, pageSize = 20, filters: { report_type?: string; review_status?: string } = {}): Promise<ReviewQueueResponse> {
+  return request<ReviewQueueResponse>("/api/v1/review/all", {
+    method: "GET",
+    query: {
+      page,
+      page_size: pageSize,
+      report_type: filters.report_type,
+      review_status: filters.review_status,
+    },
   });
 }

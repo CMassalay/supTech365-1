@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { FileCheck, RefreshCw, UserPlus, AlertTriangle } from "lucide-react";
+import { FileCheck, RefreshCw, UserPlus, AlertTriangle, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -16,51 +16,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ReportTypeBadge } from "@/components/ui/StatusBadge";
 import { Input } from "@/components/ui/input";
-
-interface PendingValidation {
-  id: string;
-  referenceNumber: string;
-  type: "CTR" | "STR";
-  entityName: string;
-  transactionCount: number;
-  submittedDate: string;
-  age: string;
-  overdue?: boolean;
-}
-
-const mockPendingValidations: PendingValidation[] = [
-  {
-    id: "FIA-2026-0231",
-    referenceNumber: "FIA-2026-0231",
-    type: "CTR",
-    entityName: "UBA Liberia",
-    transactionCount: 5,
-    submittedDate: "2026-01-17",
-    age: "4d",
-    overdue: true,
-  },
-  {
-    id: "FIA-2026-0235",
-    referenceNumber: "FIA-2026-0235",
-    type: "CTR",
-    entityName: "Liberia Bank",
-    transactionCount: 12,
-    submittedDate: "2026-01-20",
-    age: "1d",
-  },
-  {
-    id: "FIA-2026-0236",
-    referenceNumber: "FIA-2026-0236",
-    type: "STR",
-    entityName: "ABC Microfinance",
-    transactionCount: 3,
-    submittedDate: "2026-01-20",
-    age: "1d",
-  },
-];
+import { useValidationQueue } from "@/hooks/useManualValidation";
+import { useTeamWorkload } from "@/hooks/useTeamWorkload";
+import { differenceInDays } from "date-fns";
 
 export default function PendingValidations() {
   const [selected, setSelected] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
+  const { data: queueData, isLoading: queueLoading, refetch: refetchQueue } = useValidationQueue({
+    validationStatus: "PENDING"
+  }, page, pageSize);
+  const { data: teamData, isLoading: teamLoading } = useTeamWorkload();
 
   const breadcrumbItems = [
     { label: "Compliance Workspace", icon: <FileCheck className="h-5 w-5" /> },
@@ -77,7 +45,7 @@ export default function PendingValidations() {
             <FileCheck className="h-6 w-6 text-primary" />
             Pending Manual Validation (Unassigned)
           </h1>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => refetchQueue()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -100,19 +68,6 @@ export default function PendingValidations() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Entities</SelectItem>
-              <SelectItem value="bank_of_monrovia">Bank of Monrovia</SelectItem>
-              <SelectItem value="uba">UBA Liberia</SelectItem>
-              <SelectItem value="ecobank">Ecobank Liberia</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select defaultValue="all">
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Date Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Dates</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="week">This Week</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="ghost" size="sm">
@@ -122,59 +77,73 @@ export default function PendingValidations() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Unassigned Pool ({mockPendingValidations.length} items)</CardTitle>
+            <CardTitle>Unassigned Pool ({queueData?.total || 0} items)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Table>
-              <TableHeader>
-                <TableRow className="data-table-header">
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selected.length === mockPendingValidations.length}
-                      onCheckedChange={(checked) => {
-                        if (checked) setSelected(mockPendingValidations.map(v => v.id));
-                        else setSelected([]);
-                      }}
-                    />
-                  </TableHead>
-                  <TableHead>Ref #</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Entity</TableHead>
-                  <TableHead>Trans</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Age</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockPendingValidations.map((v) => (
-                  <TableRow key={v.id} className="data-table-row">
-                    <TableCell>
+            {queueLoading ? (
+              <div className="p-12 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="data-table-header">
+                    <TableHead className="w-12">
                       <Checkbox
-                        checked={selected.includes(v.id)}
+                        checked={selected.length > 0 && selected.length === (queueData?.items.length || 0)}
                         onCheckedChange={(checked) => {
-                          if (checked) setSelected([...selected, v.id]);
-                          else setSelected(selected.filter(id => id !== v.id));
+                          if (checked) setSelected(queueData?.items.map(v => v.submission_id) || []);
+                          else setSelected([]);
                         }}
                       />
-                    </TableCell>
-                    <TableCell className="font-mono font-medium text-primary">{v.referenceNumber}</TableCell>
-                    <TableCell>
-                      <ReportTypeBadge type={v.type} />
-                    </TableCell>
-                    <TableCell>{v.entityName}</TableCell>
-                    <TableCell>{v.transactionCount}</TableCell>
-                    <TableCell className="text-muted-foreground">{v.submittedDate}</TableCell>
-                    <TableCell className={`inline-flex items-center gap-1 ${v.overdue ? "text-destructive font-medium" : ""}`}>
-                      {v.age}{v.overdue ? <AlertTriangle className="h-4 w-4 shrink-0" /> : ""}
-                    </TableCell>
+                    </TableHead>
+                    <TableHead>Ref #</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Entity</TableHead>
+                    <TableHead>Trans</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Age</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {queueData?.items.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        No pending validations found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    queueData?.items.map((v) => (
+                      <TableRow key={v.submission_id} className="data-table-row">
+                        <TableCell>
+                          <Checkbox
+                            checked={selected.includes(v.submission_id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) setSelected([...selected, v.submission_id]);
+                              else setSelected(selected.filter(id => id !== v.submission_id));
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono font-medium text-primary">{v.reference_number}</TableCell>
+                        <TableCell>
+                          <ReportTypeBadge type={v.report_type as any} />
+                        </TableCell>
+                        <TableCell>{v.entity_name}</TableCell>
+                        <TableCell>{v.transaction_count}</TableCell>
+                        <TableCell className="text-muted-foreground">{v.submitted_at}</TableCell>
+                        <TableCell>
+                          {differenceInDays(new Date(), new Date(v.submitted_at))}d
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
 
             <div className="flex items-center justify-between">
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setSelected(mockPendingValidations.map(v => v.id))}>
+                <Button variant="outline" size="sm" onClick={() => setSelected(queueData?.items.map(v => v.submission_id) || [])}>
                   Select All
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setSelected([])}>
@@ -187,12 +156,14 @@ export default function PendingValidations() {
                     <SelectValue placeholder="Assign to" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="jane">Jane Doe</SelectItem>
-                    <SelectItem value="john">John Smith</SelectItem>
-                    <SelectItem value="mary">Mary Johnson</SelectItem>
+                    {teamData?.map(officer => (
+                      <SelectItem key={officer.user_id} value={officer.user_id}>
+                        {officer.user_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <Input type="date" className="w-[160px]" defaultValue="2026-01-25" />
+                <Input type="date" className="w-[160px]" defaultValue={new Date().toISOString().split('T')[0]} />
                 <Button size="sm" disabled={selected.length === 0}>
                   <UserPlus className="h-4 w-4 mr-2" />
                   Assign Selected

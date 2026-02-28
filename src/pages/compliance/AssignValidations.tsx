@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { FileCheck, RefreshCw, UserPlus } from "lucide-react";
+import { FileCheck, RefreshCw, UserPlus, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -16,40 +16,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ReportTypeBadge } from "@/components/ui/StatusBadge";
-
-interface ReassignValidation {
-  id: string;
-  referenceNumber: string;
-  type: "CTR" | "STR";
-  entityName: string;
-  currentAssignee: string;
-  status: "Pending" | "In Progress";
-  age: string;
-}
-
-const mockReassignValidations: ReassignValidation[] = [
-  {
-    id: "FIA-2026-0234",
-    referenceNumber: "FIA-2026-0234",
-    type: "CTR",
-    entityName: "Bank of Monrovia",
-    currentAssignee: "Jane Doe",
-    status: "Pending",
-    age: "1d",
-  },
-  {
-    id: "FIA-2026-0233",
-    referenceNumber: "FIA-2026-0233",
-    type: "CTR",
-    entityName: "First Intl Bank",
-    currentAssignee: "John Smith",
-    status: "Pending",
-    age: "2d",
-  },
-];
+import { useValidationQueue } from "@/hooks/useManualValidation";
+import { useTeamWorkload } from "@/hooks/useTeamWorkload";
+import { differenceInDays } from "date-fns";
 
 export default function AssignValidations() {
   const [selected, setSelected] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
+  const { data: queueData, isLoading: queueLoading, refetch: refetchQueue } = useValidationQueue({
+    validationStatus: "IN_REVIEW"
+  }, page, pageSize);
+  const { data: teamData, isLoading: teamLoading, refetch: refetchTeam } = useTeamWorkload();
 
   const breadcrumbItems = [
     { label: "Compliance Workspace", icon: <FileCheck className="h-5 w-5" /> },
@@ -66,7 +45,7 @@ export default function AssignValidations() {
             <FileCheck className="h-6 w-6 text-primary" />
             Assign/Reassign Validations
           </h1>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => { refetchQueue(); refetchTeam(); }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -74,78 +53,82 @@ export default function AssignValidations() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Reassign Existing Validations</CardTitle>
+            <CardTitle>Reassign Existing Validations ({queueData?.total || 0} items)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2 flex-wrap">
               <Input placeholder="Search by Ref # / Entity / Assignee..." className="flex-1 min-w-[260px]" />
-              <Select defaultValue="pending">
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                </SelectContent>
-              </Select>
               <Button variant="ghost" size="sm">
                 Clear
               </Button>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow className="data-table-header">
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selected.length === mockReassignValidations.length}
-                      onCheckedChange={(checked) => {
-                        if (checked) setSelected(mockReassignValidations.map(v => v.id));
-                        else setSelected([]);
-                      }}
-                    />
-                  </TableHead>
-                  <TableHead>Ref #</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Entity</TableHead>
-                  <TableHead>Current Assignee</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Age</TableHead>
-                  <TableHead>Reason</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockReassignValidations.map((v) => (
-                  <TableRow key={v.id} className="data-table-row">
-                    <TableCell>
+            {queueLoading ? (
+              <div className="p-12 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="data-table-header">
+                    <TableHead className="w-12">
                       <Checkbox
-                        checked={selected.includes(v.id)}
+                        checked={selected.length === (queueData?.items.length || 0) && (queueData?.items.length || 0) > 0}
                         onCheckedChange={(checked) => {
-                          if (checked) setSelected([...selected, v.id]);
-                          else setSelected(selected.filter(id => id !== v.id));
+                          if (checked) setSelected(queueData?.items.map(v => v.submission_id) || []);
+                          else setSelected([]);
                         }}
                       />
-                    </TableCell>
-                    <TableCell className="font-mono font-medium text-primary">{v.referenceNumber}</TableCell>
-                    <TableCell>
-                      <ReportTypeBadge type={v.type} />
-                    </TableCell>
-                    <TableCell>{v.entityName}</TableCell>
-                    <TableCell>{v.currentAssignee}</TableCell>
-                    <TableCell>{v.status}</TableCell>
-                    <TableCell>{v.age}</TableCell>
-                    <TableCell>
-                      <Input placeholder="Enter reason..." className="w-[220px]" />
-                    </TableCell>
+                    </TableHead>
+                    <TableHead>Ref #</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Entity</TableHead>
+                    <TableHead>Current Assignee</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Age</TableHead>
+                    <TableHead>Reason</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {queueData?.items.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="h-24 text-center">
+                        No validations found to reassign.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    queueData?.items.map((v) => (
+                      <TableRow key={v.submission_id} className="data-table-row">
+                        <TableCell>
+                          <Checkbox
+                            checked={selected.includes(v.submission_id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) setSelected([...selected, v.submission_id]);
+                              else setSelected(selected.filter(id => id !== v.submission_id));
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono font-medium text-primary">{v.reference_number}</TableCell>
+                        <TableCell>
+                          <ReportTypeBadge type={v.report_type as any} />
+                        </TableCell>
+                        <TableCell>{v.entity_name}</TableCell>
+                        <TableCell>{v.assigned_to_name || "Unassigned"}</TableCell>
+                        <TableCell>{v.validation_status}</TableCell>
+                        <TableCell>{differenceInDays(new Date(), new Date(v.submitted_at))}d</TableCell>
+                        <TableCell>
+                          <Input placeholder="Enter reason..." className="w-[220px]" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
 
             <div className="flex items-center justify-between">
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setSelected(mockReassignValidations.map(v => v.id))}>
+                <Button variant="outline" size="sm" onClick={() => setSelected(queueData?.items.map(v => v.submission_id) || [])}>
                   Select All
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setSelected([])}>
@@ -158,9 +141,11 @@ export default function AssignValidations() {
                     <SelectValue placeholder="Reassign to" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="jane">Jane Doe</SelectItem>
-                    <SelectItem value="john">John Smith</SelectItem>
-                    <SelectItem value="mary">Mary Johnson</SelectItem>
+                    {teamData?.map(officer => (
+                      <SelectItem key={officer.user_id} value={officer.user_id}>
+                        {officer.user_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Button size="sm" disabled={selected.length === 0}>

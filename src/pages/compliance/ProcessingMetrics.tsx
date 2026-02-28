@@ -1,15 +1,34 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { TrendingUp, BarChart3 } from "lucide-react";
+import { TrendingUp, BarChart3, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDashboardStatistics, useCTRWorkloadDistribution } from "@/hooks/useDashboard";
 
 export default function ProcessingMetrics() {
+  const { data: stats, isLoading: statsLoading } = useDashboardStatistics();
+  const { data: ctrWorkload, isLoading: workloadLoading } = useCTRWorkloadDistribution();
+
   const breadcrumbItems = [
     { label: "Compliance Workspace", icon: <BarChart3 className="h-5 w-5" /> },
     { label: "Dashboards", link: "/compliance/dashboards/processing" },
     { label: "CTR Processing Metrics" },
   ];
+
+  if (statsLoading || workloadLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const kpis = stats?.kpis || {};
+  const totalSubmissions = ctrWorkload?.reduce((acc: number, curr: any) => acc + curr.assigned, 0) || 0;
+  const totalReviewed = ctrWorkload?.reduce((acc: number, curr: any) => acc + curr.reviewed, 0) || 0;
+  const passRate = totalSubmissions > 0 ? Math.round((totalReviewed / totalSubmissions) * 100) : 0;
 
   return (
     <MainLayout>
@@ -42,7 +61,7 @@ export default function ProcessingMetrics() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total CTRs</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">150</div>
+              <div className="text-3xl font-bold">{totalSubmissions}</div>
             </CardContent>
           </Card>
           <Card>
@@ -50,8 +69,8 @@ export default function ProcessingMetrics() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Validated</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">145</div>
-              <div className="text-sm text-muted-foreground mt-1">(97%)</div>
+              <div className="text-3xl font-bold">{totalReviewed}</div>
+              <div className="text-sm text-muted-foreground mt-1">({passRate}%)</div>
             </CardContent>
           </Card>
           <Card>
@@ -59,8 +78,8 @@ export default function ProcessingMetrics() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Escalated</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">12</div>
-              <div className="text-sm text-muted-foreground mt-1">(8%)</div>
+              <div className="text-3xl font-bold">{kpis.open_cases || 0}</div>
+              <div className="text-sm text-muted-foreground mt-1">({kpis.escalation_rate || "0%"})</div>
             </CardContent>
           </Card>
           <Card>
@@ -68,7 +87,7 @@ export default function ProcessingMetrics() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Avg Processing Time</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">2.3d</div>
+              <div className="text-3xl font-bold">{kpis.avg_processing_time || "0d"}</div>
             </CardContent>
           </Card>
         </div>
@@ -98,7 +117,7 @@ export default function ProcessingMetrics() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              35% improvement from baseline (3.5 days → 2.3 days)
+              Trend based on real-time data
             </p>
           </CardContent>
         </Card>
@@ -128,7 +147,7 @@ export default function ProcessingMetrics() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              Current: 8% (Target range: 5-10%)
+              Current: {kpis.escalation_rate || "0%"} (Target range: 5-10%)
             </p>
           </CardContent>
         </Card>
@@ -141,22 +160,17 @@ export default function ProcessingMetrics() {
           <CardContent className="p-0">
             <div className="divide-y">
               <div className="grid grid-cols-4 gap-4 p-4 items-center">
-                <div className="font-medium">Entity</div>
-                <div className="text-sm text-muted-foreground">Submissions</div>
-                <div className="text-sm text-muted-foreground">Validation Pass</div>
-                <div className="text-sm text-muted-foreground">Escalation Rate</div>
+                <div className="font-medium">Officer</div>
+                <div className="text-sm text-muted-foreground">Assigned</div>
+                <div className="text-sm text-muted-foreground">Reviewed</div>
+                <div className="text-sm text-muted-foreground">Avg Time</div>
               </div>
-              {[
-                { entity: "Bank of Monrovia", submissions: 45, pass: "98%", escalation: "11%" },
-                { entity: "First Intl Bank", submissions: 38, pass: "95%", escalation: "5%" },
-                { entity: "Ecobank Liberia", submissions: 32, pass: "100%", escalation: "6%" },
-                { entity: "UBA Liberia", submissions: 28, pass: "96%", escalation: "7%" },
-              ].map((item, idx) => (
+              {ctrWorkload?.map((item: any, idx: number) => (
                 <div key={idx} className="grid grid-cols-4 gap-4 p-4 items-center hover:bg-muted/50">
-                  <div className="font-medium">{item.entity}</div>
-                  <div>{item.submissions}</div>
-                  <div>{item.pass}</div>
-                  <div>{item.escalation}</div>
+                  <div className="font-medium">{item.officer}</div>
+                  <div>{item.assigned}</div>
+                  <div>{item.reviewed}</div>
+                  <div>{item.avgTime}</div>
                 </div>
               ))}
             </div>

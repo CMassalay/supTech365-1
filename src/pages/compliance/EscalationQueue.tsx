@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { Flag, RefreshCw, AlertTriangle, TrendingUp } from "lucide-react";
+import { Flag, RefreshCw, AlertTriangle, TrendingUp, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   Table,
@@ -17,52 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-
-interface Escalation {
-  id: string;
-  referenceNumber: string;
-  flaggedBy: string;
-  subjectCount: number;
-  primarySubject?: string;
-  amount: string;
-  transactionCount: number;
-  flaggedDate: string;
-  riskLevel: "high" | "medium";
-}
-
-const mockEscalations: Escalation[] = [
-  {
-    id: "1",
-    referenceNumber: "FIA-0234",
-    flaggedBy: "Jane Doe",
-    subjectCount: 3,
-    primarySubject: "S.K.",
-    amount: "$62,500",
-    transactionCount: 847,
-    flaggedDate: "Jan 20 16:30",
-    riskLevel: "high",
-  },
-  {
-    id: "2",
-    referenceNumber: "FIA-0223",
-    flaggedBy: "John Smith",
-    subjectCount: 5,
-    amount: "$145,000",
-    transactionCount: 234,
-    flaggedDate: "Jan 19 14:15",
-    riskLevel: "high",
-  },
-  {
-    id: "3",
-    referenceNumber: "FIA-0215",
-    flaggedBy: "Mary J.",
-    subjectCount: 2,
-    amount: "$35,800",
-    transactionCount: 12,
-    flaggedDate: "Jan 18 11:45",
-    riskLevel: "medium",
-  },
-];
+import { useEscalatedReports } from "@/hooks/useReviewQueue";
+import { format } from "date-fns";
 
 interface EscalationQueueProps {
   defaultTab?: "pending" | "approved" | "rejected" | "all";
@@ -70,12 +26,33 @@ interface EscalationQueueProps {
 
 export default function EscalationQueue({ defaultTab = "pending" }: EscalationQueueProps) {
   const [tab, setTab] = useState(defaultTab);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
+  const { data, isLoading, error, refetch } = useEscalatedReports(page, pageSize);
 
   const breadcrumbItems = [
     { label: "Compliance Workspace", icon: <Flag className="h-5 w-5" /> },
     { label: "Escalation Queue", link: "/compliance/escalation/pending" },
     { label: tab === "pending" ? "Pending Approval" : tab === "approved" ? "Approved" : tab === "rejected" ? "Rejected" : "All" },
   ];
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="p-6">
+          <Card className="border-destructive">
+            <CardContent className="p-6 text-center">
+              <p className="text-destructive font-medium">Failed to load escalation queue</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -89,8 +66,8 @@ export default function EscalationQueue({ defaultTab = "pending" }: EscalationQu
               Escalation Approval Queue
             </h1>
           </div>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Refresh
           </Button>
         </div>
@@ -98,10 +75,10 @@ export default function EscalationQueue({ defaultTab = "pending" }: EscalationQu
         {/* Tabs */}
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
-            <TabsTrigger value="pending">Pending Approval (3)</TabsTrigger>
-            <TabsTrigger value="approved">Approved (8)</TabsTrigger>
-            <TabsTrigger value="rejected">Rejected (2)</TabsTrigger>
-            <TabsTrigger value="all">All (13)</TabsTrigger>
+            <TabsTrigger value="pending">Pending Approval ({data?.total || 0})</TabsTrigger>
+            <TabsTrigger value="approved">Approved (0)</TabsTrigger>
+            <TabsTrigger value="rejected">Rejected (0)</TabsTrigger>
+            <TabsTrigger value="all">All ({data?.total || 0})</TabsTrigger>
           </TabsList>
 
           <TabsContent value={tab} className="space-y-6">
@@ -113,9 +90,6 @@ export default function EscalationQueue({ defaultTab = "pending" }: EscalationQu
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Officers</SelectItem>
-                  <SelectItem value="jane">Jane Doe</SelectItem>
-                  <SelectItem value="john">John Smith</SelectItem>
-                  <SelectItem value="mary">Mary J.</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -160,58 +134,96 @@ export default function EscalationQueue({ defaultTab = "pending" }: EscalationQu
             {/* Escalation Table */}
             <Card>
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="data-table-header">
-                      <TableHead>Ref#</TableHead>
-                      <TableHead>Flagged By</TableHead>
-                      <TableHead>Subjects</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Trans</TableHead>
-                      <TableHead>Flagged Date</TableHead>
-                      <TableHead>Risk</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mockEscalations.map((esc) => (
-                      <TableRow key={esc.id} className="data-table-row">
-                        <TableCell className="font-mono font-medium text-primary">
-                          {esc.referenceNumber}
-                        </TableCell>
-                        <TableCell>{esc.flaggedBy}</TableCell>
-                        <TableCell>
-                          {esc.subjectCount} {esc.primarySubject && `(${esc.primarySubject})`}
-                        </TableCell>
-                        <TableCell className="font-medium">{esc.amount}</TableCell>
-                        <TableCell>{esc.transactionCount}</TableCell>
-                        <TableCell className="text-muted-foreground">{esc.flaggedDate}</TableCell>
-                        <TableCell>
-                          {esc.riskLevel === "high" && (
-                            <Badge variant="destructive" className="gap-1">
-                              <AlertTriangle className="h-3 w-3" />
-                              High
-                            </Badge>
-                          )}
-                          {esc.riskLevel === "medium" && (
-                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
-                              Medium
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                        <Link to={`/compliance/escalation/${esc.id}/escalate`}>
-                          <Button size="sm" variant="outline">
-                            Review
-                          </Button>
-                        </Link>
-                        </TableCell>
+                {isLoading ? (
+                  <div className="p-12 text-center">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                    <p className="mt-4 text-muted-foreground">Loading escalation queue...</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="data-table-header">
+                        <TableHead>Ref#</TableHead>
+                        <TableHead>Flagged By</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Trans</TableHead>
+                        <TableHead>Flagged Date</TableHead>
+                        <TableHead>Risk</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {data?.items.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="h-24 text-center">
+                            No escalations found.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        data?.items.map((esc) => (
+                          <TableRow key={esc.submission_id} className="data-table-row">
+                            <TableCell className="font-mono font-medium text-primary">
+                              {esc.reference_number}
+                            </TableCell>
+                            <TableCell>{esc.assigned_to_name || "Unassigned"}</TableCell>
+                            <TableCell>{esc.report_type}</TableCell>
+                            <TableCell className="font-medium">${esc.total_amount.toLocaleString()}</TableCell>
+                            <TableCell>{esc.transaction_count}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {format(new Date(esc.submitted_at), "MMM dd HH:mm")}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="destructive" className="gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                High
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Link to={`/compliance/escalation/${esc.submission_id}/escalate`}>
+                                <Button size="sm" variant="outline">
+                                  Review
+                                </Button>
+                              </Link>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
+
+            {data && data.total_pages > 1 && (
+              <Pagination className="mt-4">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: data.total_pages }, (_, i) => i + 1).map((p) => (
+                    <PaginationItem key={p}>
+                      <PaginationLink 
+                        onClick={() => setPage(p)}
+                        isActive={page === p}
+                        className="cursor-pointer"
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => setPage(p => Math.min(data.total_pages, p + 1))}
+                      className={page === data.total_pages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
           </TabsContent>
         </Tabs>
 

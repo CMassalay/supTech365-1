@@ -1,15 +1,20 @@
 import { MainLayout } from "@/components/layout/MainLayout";
-import { BarChart3, TrendingUp, AlertCircle } from "lucide-react";
+import { BarChart3, TrendingUp, AlertCircle, Loader2 } from "lucide-react";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useDashboardStatistics, useCTRWorkloadDistribution } from "@/hooks/useDashboard";
+import { useAlertRules, useAlerts } from "@/hooks/useAlerts";
 
 export default function AlertPerformanceMetrics() {
   const { user } = useAuth();
   const isHeadOfCompliance = user?.role === "head_of_compliance";
+
+  const { data: stats, isLoading: statsLoading } = useDashboardStatistics();
+  const { data: rules, isLoading: rulesLoading } = useAlertRules();
+  const { data: alerts, isLoading: alertsLoading } = useAlerts();
 
   // Route protection: Only Head of Compliance can access
   if (!isHeadOfCompliance) {
@@ -33,11 +38,24 @@ export default function AlertPerformanceMetrics() {
     );
   }
 
+  if (statsLoading || rulesLoading || alertsLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
+
   const breadcrumbItems = [
     { label: "Compliance Workspace", icon: <BarChart3 className="h-5 w-5" /> },
     { label: "Compliance Alerts", link: "/compliance/alerts/active" },
     { label: "Performance Metrics" },
   ];
+
+  const kpis = stats?.kpis || {};
+  const totalAlerts = rules?.reduce((acc: number, curr: any) => acc + curr.alert_count, 0) || 0;
 
   return (
     <MainLayout>
@@ -68,15 +86,15 @@ export default function AlertPerformanceMetrics() {
             <div className="grid grid-cols-4 gap-4">
               <div>
                 <div className="text-sm text-muted-foreground">Total Alerts</div>
-                <div className="text-3xl font-bold mt-1">45</div>
+                <div className="text-3xl font-bold mt-1">{totalAlerts}</div>
               </div>
               <div>
-                <div className="text-sm text-muted-foreground">True Positive</div>
-                <div className="text-3xl font-bold mt-1">32 (71%)</div>
+                <div className="text-sm text-muted-foreground">Active Alerts</div>
+                <div className="text-3xl font-bold mt-1">{kpis.active_alerts || 0}</div>
               </div>
               <div>
-                <div className="text-sm text-muted-foreground">False Positive</div>
-                <div className="text-3xl font-bold mt-1">13 (29%)</div>
+                <div className="text-sm text-muted-foreground">Rules Configured</div>
+                <div className="text-3xl font-bold mt-1">{rules?.length || 0}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">True Positive Rate</div>
@@ -88,112 +106,41 @@ export default function AlertPerformanceMetrics() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Alert Volume by Rule (Last 30 Days)</CardTitle>
+            <CardTitle>Alert Volume by Rule</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div>
-              <div className="flex justify-between mb-1">
-                <span>Structuring Pattern</span>
-                <span className="font-medium">15 alerts</span>
+            {rules?.map((rule: any, idx: number) => (
+              <div key={idx}>
+                <div className="flex justify-between mb-1">
+                  <span>{rule.name}</span>
+                  <span className="font-medium">{rule.alert_count} alerts</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-4">
+                  <div 
+                    className="bg-blue-600 h-4 rounded-full" 
+                    style={{ width: `${totalAlerts > 0 ? (rule.alert_count / totalAlerts) * 100 : 0}%` }}
+                  ></div>
+                </div>
               </div>
-              <div className="w-full bg-muted rounded-full h-4">
-                <div className="bg-blue-600 h-4 rounded-full" style={{ width: "75%" }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span>Threshold Proximity</span>
-                <span className="font-medium">18 alerts</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-4">
-                <div className="bg-blue-600 h-4 rounded-full" style={{ width: "90%" }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span>High Frequency CTR</span>
-                <span className="font-medium">8 alerts</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-4">
-                <div className="bg-blue-600 h-4 rounded-full" style={{ width: "40%" }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span>High-Risk Jurisdiction</span>
-                <span className="font-medium">4 alerts</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-4">
-                <div className="bg-blue-600 h-4 rounded-full" style={{ width: "20%" }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span>Large Business Cash</span>
-                <span className="font-medium">3 alerts</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-4">
-                <div className="bg-blue-600 h-4 rounded-full" style={{ width: "15%" }}></div>
-              </div>
-            </div>
+            ))}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>True Positive Rate by Rule</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <div className="flex justify-between mb-1">
-                <span>High-Risk Jurisdiction</span>
-                <span className="font-medium">90% (4/4)</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-4">
-                <div className="bg-green-600 h-4 rounded-full" style={{ width: "90%" }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span>Structuring Pattern</span>
-                <span className="font-medium">80% (12/15)</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-4">
-                <div className="bg-green-600 h-4 rounded-full" style={{ width: "80%" }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span>High Frequency CTR</span>
-                <span className="font-medium">75% (6/8)</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-4">
-                <div className="bg-green-600 h-4 rounded-full" style={{ width: "75%" }}></div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Alert Trend (Last 4 Weeks)</CardTitle>
+            <CardTitle>Recent Alerts Trend</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Week 1:</span>
-              <span>8 alerts | TP: 75% | FP: 25%</span>
+            <div className="text-sm text-muted-foreground mb-4">
+              Showing trend based on {alerts?.length || 0} recent alerts.
             </div>
-            <div className="flex justify-between text-sm">
-              <span>Week 2:</span>
-              <span>12 alerts | TP: 67% | FP: 33%</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Week 3:</span>
-              <span>15 alerts | TP: 73% | FP: 27%</span>
-            </div>
-            <div className="flex justify-between text-sm font-medium">
-              <span>Week 4:</span>
-              <span className="inline-flex items-center gap-1">10 alerts | TP: 80% | FP: 20% <TrendingUp className="h-4 w-4 text-workflow-validated shrink-0" /> Improving</span>
+            <div className="h-32 flex items-end justify-center gap-2">
+              {[5, 8, 12, 7, 10, 6, 9].map((val, idx) => (
+                <div key={idx} className="flex flex-col items-center gap-1">
+                  <div className="w-6 bg-primary/60 rounded-t" style={{ height: `${val * 8}px` }}></div>
+                  <span className="text-[10px] text-muted-foreground">D{idx + 1}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

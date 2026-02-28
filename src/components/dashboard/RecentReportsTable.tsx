@@ -15,66 +15,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Report {
   id: string;
-  referenceNumber: string;
-  type: ReportType;
+  reference_number: string;
+  report_type: ReportType;
   status: WorkflowStatus;
-  entityName: string;
-  submittedDate: string;
-  daysInQueue: number;
+  entity_name: string;
+  submitted_at: string;
+  days_in_queue: number;
 }
 
-const mockReports: Report[] = [
-  {
-    id: "1",
-    referenceNumber: "FIA-2026-0234",
-    type: "CTR",
-    status: "under_review",
-    entityName: "Bank of Monrovia",
-    submittedDate: "2026-01-18",
-    daysInQueue: 2,
-  },
-  {
-    id: "2",
-    referenceNumber: "FIA-2026-0233",
-    type: "STR",
-    status: "validated",
-    entityName: "First Trust Bank",
-    submittedDate: "2026-01-17",
-    daysInQueue: 3,
-  },
-  {
-    id: "3",
-    referenceNumber: "FIA-2026-0232",
-    type: "Escalated CTR",
-    status: "escalated",
-    entityName: "Liberian MFI",
-    submittedDate: "2026-01-16",
-    daysInQueue: 4,
-  },
-  {
-    id: "4",
-    referenceNumber: "FIA-2026-0231",
-    type: "CTR",
-    status: "submitted",
-    entityName: "Ecobank Liberia",
-    submittedDate: "2026-01-16",
-    daysInQueue: 4,
-  },
-  {
-    id: "5",
-    referenceNumber: "FIA-2026-0230",
-    type: "STR",
-    status: "rejected",
-    entityName: "UBA Liberia",
-    submittedDate: "2026-01-15",
-    daysInQueue: 5,
-  },
-];
+interface RecentReportsTableProps {
+  data?: Report[];
+  isLoading?: boolean;
+}
 
-export function RecentReportsTable() {
+export function RecentReportsTable({ data, isLoading }: RecentReportsTableProps) {
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border bg-card p-6">
+        <Skeleton className="h-8 w-48 mb-4" />
+        <div className="space-y-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const reports = data || [];
+
   return (
     <div className="rounded-lg border bg-card">
       <div className="flex items-center justify-between p-4 border-b">
@@ -100,53 +73,63 @@ export function RecentReportsTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {mockReports.map((report) => (
-            <TableRow key={report.id} className="data-table-row">
-              <TableCell className="font-mono-ref font-medium text-primary">
-                {report.referenceNumber}
-              </TableCell>
-              <TableCell>
-                <ReportTypeBadge type={report.type} />
-              </TableCell>
-              <TableCell className="max-w-[150px] truncate">{report.entityName}</TableCell>
-              <TableCell className="text-muted-foreground">{report.submittedDate}</TableCell>
-              <TableCell>
-                <StatusBadge status={report.status} />
-              </TableCell>
-              <TableCell className="text-right">
-                <span
-                  className={
-                    report.daysInQueue > 7
-                      ? "text-destructive font-medium"
-                      : report.daysInQueue > 5
-                      ? "text-risk-high font-medium"
-                      : "text-muted-foreground"
-                  }
-                >
-                  {report.daysInQueue}d
-                </span>
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
-                      <Eye className="mr-2 h-4 w-4" />
-                      View Details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <ArrowRight className="mr-2 h-4 w-4" />
-                      Take Action
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+          {reports.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                No recent reports found
               </TableCell>
             </TableRow>
-          ))}
+          ) : (
+            reports.map((report) => (
+              <TableRow key={report.id} className="data-table-row">
+                <TableCell className="font-mono-ref font-medium text-primary">
+                  {report.reference_number}
+                </TableCell>
+                <TableCell>
+                  <ReportTypeBadge type={report.report_type} />
+                </TableCell>
+                <TableCell className="max-w-[150px] truncate">{report.entity_name}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {new Date(report.submitted_at).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  <StatusBadge status={report.status} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <span
+                    className={
+                      report.days_in_queue > 7
+                        ? "text-destructive font-medium"
+                        : report.days_in_queue > 5
+                        ? "text-risk-high font-medium"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {report.days_in_queue}d
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        Take Action
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
     </div>

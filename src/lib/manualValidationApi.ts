@@ -167,3 +167,15 @@ export async function fetchAuditLogs(filters: AuditLogFilters, page: number, pag
     }
   );
 }
+
+export async function fetchManualValidationHistory(page: number, pageSize: number, reportType?: string): Promise<QueueResponse> {
+  return await request<QueueResponse>(
+    "/api/v1/validation/manual-validation/history",
+    { method: "GET" },
+    {
+      page,
+      page_size: pageSize,
+      report_type: reportType,
+    }
+  );
+}

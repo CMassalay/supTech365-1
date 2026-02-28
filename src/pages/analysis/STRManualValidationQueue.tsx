@@ -1,0 +1,158 @@
+import { useNavigate } from "react-router-dom";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { Breadcrumb } from "@/components/layout/Breadcrumb";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { Inbox, RefreshCw } from "lucide-react";
+import { useValidationStore } from "@/hooks/useValidationStore";
+import { useValidationQueue } from "@/hooks/useManualValidation";
+import { ValidationQueueFilters } from "@/components/compliance/validation/ValidationQueueFilters";
+import { ValidationQueueTable } from "@/components/compliance/validation/ValidationQueueTable";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import type { QueueFilters, QueueItem, ReportType } from "@/types/manualValidation";
+
+export default function STRManualValidationQueue() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { queueFilters, setQueueFilters, resetQueueFilters } = useValidationStore();
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  
+  const roleDefaults = useMemo<Partial<QueueFilters>>(() => {
+    return { reportType: "STR", assignedToMe: true };
+  }, []);
+
+  const effectiveFilters = useMemo<QueueFilters>(
+    () => ({ ...queueFilters, ...roleDefaults }),
+    [queueFilters, roleDefaults]
+  );
+
+  useEffect(() => {
+    const normalizedFilters: Partial<QueueFilters> = {};
+    if (queueFilters.reportType !== "STR") {
+      normalizedFilters.reportType = "STR";
+    }
+    if (queueFilters.assignedToMe !== true) {
+      normalizedFilters.assignedToMe = true;
+    }
+    if (Object.keys(normalizedFilters).length > 0) {
+      setQueueFilters(normalizedFilters);
+    }
+  }, [queueFilters.assignedToMe, queueFilters.reportType, setQueueFilters]);
+
+  const { data, isLoading, refetch } = useValidationQueue(effectiveFilters, page, pageSize);
+  const total = data?.total ?? 0;
+  const items = data?.items ?? [];
+  const pageTitle = "Manual Validation Queue";
+
+  const getDueDate = (item: QueueItem) => {
+    if (item.due_at) {
+      return new Date(item.due_at);
+    }
+    const enteredAt = new Date(item.entered_queue_at || item.submitted_at);
+    return new Date(enteredAt.getTime() + 48 * 60 * 60 * 1000);
+  };
+
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const dueA = getDueDate(a).getTime();
+      const dueB = getDueDate(b).getTime();
+      if (dueA !== dueB) {
+        return dueA - dueB;
+      }
+      return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime();
+    });
+  }, [items]);
+
+  const breadcrumbItems = [
+    { label: "Analysis", href: "/analysis/manual-validation" },
+    { label: pageTitle, href: "/analysis/manual-validation" },
+  ];
+
+  return (
+    <MainLayout>
+      <div className="p-6 space-y-6">
+        <Breadcrumb items={breadcrumbItems} />
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Inbox className="h-6 w-6" />
+            {pageTitle} ({total} STRs)
+          </h1>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            <ValidationQueueFilters
+              filters={effectiveFilters}
+              onChange={(filters) => {
+                setPage(1);
+                setQueueFilters({ ...filters, ...roleDefaults });
+              }}
+              onReset={() => {
+                setPage(1);
+                resetQueueFilters();
+                setQueueFilters(roleDefaults);
+              }}
+            />
+
+            <div className="mt-4">
+              {isLoading ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">Loading queue...</div>
+              ) : (
+                <ValidationQueueTable
+                  items={sortedItems}
+                  onViewDetails={(submissionId) => navigate(`/analysis/manual-validation/${submissionId}`)}
+                />
+              )}
+            </div>
+
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {sortedItems.length ? (page - 1) * pageSize + 1 : 0}-{(page - 1) * pageSize + sortedItems.length} of {total}
+              </p>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setPage((p) => Math.max(1, p - 1));
+                      }}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink href="#">{page}</PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const maxPage = Math.max(1, Math.ceil(total / pageSize));
+                        setPage((p) => Math.min(maxPage, p + 1));
+                      }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </MainLayout>
+  );
+}

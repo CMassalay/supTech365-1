@@ -1,0 +1,146 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "FIA SupTech365" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e8]: FIA
+          - generic [ref=e9]: SupTech365
+        - generic [ref=e11]:
+          - img [ref=e12]
+          - textbox "Search reports, subjects, cases..." [ref=e15]
+          - generic:
+            - generic: ⌘
+            - text: K
+        - generic [ref=e16]:
+          - button "2" [ref=e17] [cursor=pointer]:
+            - img
+            - generic [ref=e18]: "2"
+          - button "A analyst_uat" [ref=e19] [cursor=pointer]:
+            - generic [ref=e21]: A
+            - generic [ref=e23]: analyst_uat
+            - img
+    - generic [ref=e24]:
+      - complementary [ref=e25]:
+        - generic [ref=e26]:
+          - navigation [ref=e27]:
+            - generic [ref=e28]:
+              - generic [ref=e29]: Main
+              - link "Dashboard" [ref=e32] [cursor=pointer]:
+                - /url: /
+                - img [ref=e33]
+                - generic [ref=e36]: Dashboard
+            - generic [ref=e37]:
+              - generic [ref=e38]: Analysis
+              - generic [ref=e39]:
+                - link "My Assignments" [ref=e41] [cursor=pointer]:
+                  - /url: /my-assignments
+                  - img [ref=e42]
+                  - generic [ref=e45]: My Assignments
+                - link "My Validation Queue 6" [ref=e47] [cursor=pointer]:
+                  - /url: /compliance/validation-queue
+                  - img [ref=e48]
+                  - generic [ref=e51]: My Validation Queue
+                  - generic [ref=e52]: "6"
+                - link "Subject Profiles" [ref=e54] [cursor=pointer]:
+                  - /url: /subjects
+                  - img [ref=e55]
+                  - generic [ref=e60]: Subject Profiles
+                - link "Alerts 2" [ref=e62] [cursor=pointer]:
+                  - /url: /analysis-alerts
+                  - img [ref=e63]
+                  - generic [ref=e65]: Alerts
+                  - generic [ref=e66]: "2"
+            - generic [ref=e67]:
+              - generic [ref=e68]: Cases
+              - generic [ref=e69]:
+                - link "My Cases 4" [ref=e71] [cursor=pointer]:
+                  - /url: /cases
+                  - img [ref=e72]
+                  - generic [ref=e74]: My Cases
+                  - generic [ref=e75]: "4"
+                - link "Intelligence" [ref=e77] [cursor=pointer]:
+                  - /url: /intelligence
+                  - img [ref=e78]
+                  - generic [ref=e81]: Intelligence
+          - generic [ref=e82]:
+            - link "Help & Support" [ref=e83] [cursor=pointer]:
+              - /url: /help
+              - img [ref=e84]
+              - generic [ref=e87]: Help & Support
+            - button "Collapse" [ref=e88] [cursor=pointer]:
+              - img [ref=e89]
+              - generic [ref=e91]: Collapse
+      - main [ref=e92]:
+        - generic [ref=e93]:
+          - navigation [ref=e94]:
+            - list [ref=e95]:
+              - listitem [ref=e96]:
+                - link "Compliance" [ref=e97] [cursor=pointer]:
+                  - /url: /compliance/validation
+                  - generic [ref=e98]: Compliance
+              - listitem [ref=e99]:
+                - img [ref=e100]
+                - link "My Assigned Validations" [ref=e102] [cursor=pointer]:
+                  - /url: /compliance/validation-queue
+                  - generic [ref=e103]: My Assigned Validations
+              - listitem [ref=e104]:
+                - img [ref=e105]
+                - generic [ref=e108]: Report Review
+          - button "Back to My Assigned Validations" [ref=e109] [cursor=pointer]:
+            - img
+            - text: Back to My Assigned Validations
+          - 'heading "Report Review: F5-UAT-STR-0010" [level=1] [ref=e110]'
+          - generic [ref=e112]:
+            - heading "Report Metadata" [level=3] [ref=e113]
+            - generic [ref=e114]:
+              - paragraph [ref=e115]:
+                - strong [ref=e116]: "Reference:"
+                - text: F5-UAT-STR-0010
+              - paragraph [ref=e117]: "Type: STR"
+              - paragraph [ref=e118]:
+                - strong [ref=e119]: "Entity:"
+                - text: Test Bank of Liberia
+              - paragraph [ref=e120]:
+                - strong [ref=e121]: "Submitted:"
+                - text: 2/17/2026, 9:48:59 AM
+              - paragraph [ref=e122]:
+                - strong [ref=e123]: "Status:"
+                - generic [ref=e124]: validated
+          - generic [ref=e125]:
+            - heading "Transactions (1)" [level=3] [ref=e127]
+            - table [ref=e130]:
+              - rowgroup [ref=e131]:
+                - row "# Date Type Amount Name Action" [ref=e132]:
+                  - columnheader "#" [ref=e133]
+                  - columnheader "Date" [ref=e134]
+                  - columnheader "Type" [ref=e135]
+                  - columnheader "Amount" [ref=e136]
+                  - columnheader "Name" [ref=e137]
+                  - columnheader "Action" [ref=e138]
+              - rowgroup [ref=e139]:
+                - row "1 Invalid Date NaN View" [ref=e140]:
+                  - cell "1" [ref=e141]
+                  - cell "Invalid Date" [ref=e142]
+                  - cell [ref=e143]
+                  - cell "NaN" [ref=e144]
+                  - cell [ref=e145]
+                  - cell "View" [ref=e146]:
+                    - button "View" [ref=e147] [cursor=pointer]
+          - generic [ref=e148]:
+            - button "Accept" [ref=e149] [cursor=pointer]:
+              - img
+              - text: Accept
+            - button "Return for Correction" [ref=e150] [cursor=pointer]:
+              - img
+              - text: Return for Correction
+            - button "Reject" [ref=e151] [cursor=pointer]:
+              - img
+              - text: Reject
+```

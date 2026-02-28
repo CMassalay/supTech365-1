@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { FileText, RefreshCw, TrendingUp } from "lucide-react";
+import { FileText, RefreshCw, TrendingUp, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   Table,
@@ -18,79 +18,52 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-
-interface CTR {
-  id: string;
-  referenceNumber: string;
-  entityName: string;
-  amount: string;
-  transactionCount: number;
-  subject: string;
-  assignedTo: string;
-  status: "pending" | "flagged" | "escalated" | "archived" | "monitoring";
-  age: number;
-  ageUnit: "d";
-}
-
-const mockCTRs: CTR[] = [
-  {
-    id: "1",
-    referenceNumber: "FIA-0234",
-    entityName: "Bank of M.",
-    amount: "$62,500",
-    transactionCount: 847,
-    subject: "Sarah K.",
-    assignedTo: "Jane D.",
-    status: "flagged",
-    age: 3,
-    ageUnit: "d",
-  },
-  {
-    id: "2",
-    referenceNumber: "FIA-0233",
-    entityName: "First Intl",
-    amount: "$45,200",
-    transactionCount: 234,
-    subject: "John M.",
-    assignedTo: "John S.",
-    status: "pending",
-    age: 2,
-    ageUnit: "d",
-  },
-  {
-    id: "3",
-    referenceNumber: "FIA-0232",
-    entityName: "Ecobank",
-    amount: "$89,300",
-    transactionCount: 12,
-    subject: "Diamond Ltd",
-    assignedTo: "Mary J.",
-    status: "pending",
-    age: 2,
-    ageUnit: "d",
-  },
-  {
-    id: "4",
-    referenceNumber: "FIA-0220",
-    entityName: "Bank of M.",
-    amount: "$125,000",
-    transactionCount: 45,
-    subject: "ABC Corp",
-    assignedTo: "-",
-    status: "escalated",
-    age: 5,
-    ageUnit: "d",
-  },
-];
+import { useAllReviewReports } from "@/hooks/useReviewQueue";
+import { differenceInDays } from "date-fns";
 
 export default function AllCTRs() {
   const [tab, setTab] = useState("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
+  const getReviewStatusFromTab = (t: string) => {
+    switch (t) {
+      case "pending": return "NOT_REVIEWED";
+      case "flagged": return "REVIEW_IN_PROGRESS";
+      case "escalated": return "ESCALATED";
+      case "archived": return "ARCHIVED";
+      case "monitoring": return "MONITORED";
+      default: return undefined;
+    }
+  };
+
+  const { data, isLoading, error, refetch } = useAllReviewReports(page, pageSize, { 
+    report_type: "CTR",
+    review_status: getReviewStatusFromTab(tab)
+  });
 
   const breadcrumbItems = [
     { label: "Compliance Workspace", icon: <FileText className="h-5 w-5" /> },
     { label: "CTR Review Queue", link: "/compliance/ctr-review" },
     { label: "All CTRs" },
   ];
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="p-6">
+          <Card className="border-destructive">
+            <CardContent className="p-6 text-center">
+              <p className="text-destructive font-medium">Failed to load reports</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -101,24 +74,24 @@ export default function AllCTRs() {
           <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2">
               <FileText className="h-6 w-6 text-primary" />
-              All CTRs (150 total, 25 pending, 12 escalated)
+              All CTRs ({data?.total || 0} total)
             </h1>
           </div>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Refresh
           </Button>
         </div>
 
         {/* Tabs */}
-        <Tabs value={tab} onValueChange={setTab}>
+        <Tabs value={tab} onValueChange={(v) => { setTab(v); setPage(1); }}>
           <TabsList>
-            <TabsTrigger value="all">All (150)</TabsTrigger>
-            <TabsTrigger value="pending">Pending Review (25)</TabsTrigger>
-            <TabsTrigger value="flagged">Flagged (8)</TabsTrigger>
-            <TabsTrigger value="escalated">Escalated (12)</TabsTrigger>
-            <TabsTrigger value="archived">Archived (95)</TabsTrigger>
-            <TabsTrigger value="monitoring">Under Monitoring (10)</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="pending">Pending Review</TabsTrigger>
+            <TabsTrigger value="flagged">Flagged</TabsTrigger>
+            <TabsTrigger value="escalated">Escalated</TabsTrigger>
+            <TabsTrigger value="archived">Archived</TabsTrigger>
+            <TabsTrigger value="monitoring">Under Monitoring</TabsTrigger>
           </TabsList>
 
           <TabsContent value={tab} className="space-y-6">
@@ -126,23 +99,10 @@ export default function AllCTRs() {
             <div className="flex gap-2 flex-wrap">
               <Select defaultValue="all">
                 <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="flagged">Flagged</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select defaultValue="all">
-                <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Assigned To" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Officers</SelectItem>
-                  <SelectItem value="jane">Jane Doe</SelectItem>
-                  <SelectItem value="john">John Smith</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -152,8 +112,6 @@ export default function AllCTRs() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Entities</SelectItem>
-                  <SelectItem value="bom">Bank of Monrovia</SelectItem>
-                  <SelectItem value="fib">First Intl Bank</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -167,17 +125,6 @@ export default function AllCTRs() {
                 </SelectContent>
               </Select>
 
-              <Select defaultValue="all">
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Amount Range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Amounts</SelectItem>
-                  <SelectItem value="low">Under $50k</SelectItem>
-                  <SelectItem value="high">Over $50k</SelectItem>
-                </SelectContent>
-              </Select>
-
               <Button variant="ghost" size="sm">
                 Clear
               </Button>
@@ -186,40 +133,85 @@ export default function AllCTRs() {
             {/* CTR Table */}
             <Card>
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="data-table-header">
-                      <TableHead>Ref #</TableHead>
-                      <TableHead>Entity</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Trans</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Assigned</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Age</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mockCTRs.map((ctr) => (
-                      <TableRow key={ctr.id} className="data-table-row">
-                        <TableCell className="font-mono font-medium text-primary">
-                          {ctr.referenceNumber}
-                        </TableCell>
-                        <TableCell>{ctr.entityName}</TableCell>
-                        <TableCell className="font-medium">{ctr.amount}</TableCell>
-                        <TableCell>{ctr.transactionCount}</TableCell>
-                        <TableCell>{ctr.subject}</TableCell>
-                        <TableCell>{ctr.assignedTo}</TableCell>
-                        <TableCell>
-                          <StatusBadge status={ctr.status} />
-                        </TableCell>
-                        <TableCell>{ctr.age}{ctr.ageUnit}</TableCell>
+                {isLoading ? (
+                  <div className="p-12 text-center">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                    <p className="mt-4 text-muted-foreground">Loading reports...</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="data-table-header">
+                        <TableHead>Ref #</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Trans</TableHead>
+                        <TableHead>Assigned</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Age</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {data?.items.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="h-24 text-center">
+                            No reports found.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        data?.items.map((ctr) => (
+                          <TableRow key={ctr.submission_id} className="data-table-row">
+                            <TableCell className="font-mono font-medium text-primary">
+                              {ctr.reference_number}
+                            </TableCell>
+                            <TableCell>{ctr.report_type}</TableCell>
+                            <TableCell className="font-medium">${ctr.total_amount.toLocaleString()}</TableCell>
+                            <TableCell>{ctr.transaction_count}</TableCell>
+                            <TableCell>{ctr.assigned_to_name || "-"}</TableCell>
+                            <TableCell>
+                              <StatusBadge status={ctr.review_status.toLowerCase()} />
+                            </TableCell>
+                            <TableCell>{differenceInDays(new Date(), new Date(ctr.submitted_at))}d</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
+
+            {data && data.total_pages > 1 && (
+              <Pagination className="mt-4">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: data.total_pages }, (_, i) => i + 1).map((p) => (
+                    <PaginationItem key={p}>
+                      <PaginationLink 
+                        onClick={() => setPage(p)}
+                        isActive={page === p}
+                        className="cursor-pointer"
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => setPage(p => Math.min(data.total_pages, p + 1))}
+                      className={page === data.total_pages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </TabsContent>
+        </Tabs>
 
             {/* Pagination */}
             <div className="flex items-center justify-between">

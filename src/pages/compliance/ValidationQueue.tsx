@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { FileCheck, RefreshCw, Search, AlertTriangle } from "lucide-react";
+import { FileCheck, RefreshCw, Search, AlertTriangle, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   Table,
@@ -18,71 +18,41 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ReportTypeBadge } from "@/components/ui/StatusBadge";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-
-interface Validation {
-  id: string;
-  referenceNumber: string;
-  type: "CTR" | "STR";
-  entityName: string;
-  transactionCount: number;
-  submittedDate: string;
-  age: number;
-  ageUnit: "d" | "h";
-  overdue?: boolean;
-}
-
-const mockValidations: Validation[] = [
-  {
-    id: "1",
-    referenceNumber: "FIA-2026-0234",
-    type: "CTR",
-    entityName: "Bank of Monrovia",
-    transactionCount: 847,
-    submittedDate: "2026-01-20",
-    age: 1,
-    ageUnit: "d",
-  },
-  {
-    id: "2",
-    referenceNumber: "FIA-2026-0233",
-    type: "CTR",
-    entityName: "First Intl Bank",
-    transactionCount: 234,
-    submittedDate: "2026-01-19",
-    age: 2,
-    ageUnit: "d",
-  },
-  {
-    id: "3",
-    referenceNumber: "FIA-2026-0232",
-    type: "CTR",
-    entityName: "Ecobank Liberia",
-    transactionCount: 12,
-    submittedDate: "2026-01-18",
-    age: 3,
-    ageUnit: "d",
-  },
-  {
-    id: "4",
-    referenceNumber: "FIA-2026-0231",
-    type: "CTR",
-    entityName: "UBA Liberia",
-    transactionCount: 5,
-    submittedDate: "2026-01-17",
-    age: 4,
-    ageUnit: "d",
-    overdue: true,
-  },
-];
+import { useValidationQueue } from "@/hooks/useManualValidation";
+import { differenceInDays } from "date-fns";
 
 export default function ValidationQueue() {
-  const [statusFilter, setStatusFilter] = useState("pending");
-  const [reportTypeFilter, setReportTypeFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const [statusFilter, setStatusFilter] = useState<string | undefined>("PENDING");
+  const [reportTypeFilter, setReportTypeFilter] = useState<string | undefined>(undefined);
+
+  const { data, isLoading, error, refetch } = useValidationQueue({
+    validationStatus: statusFilter as any,
+    reportType: reportTypeFilter as any
+  }, page, pageSize);
 
   const breadcrumbItems = [
     { label: "Compliance Workspace", icon: <FileCheck className="h-5 w-5" /> },
     { label: "Validation Queue" },
   ];
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="p-6">
+          <Card className="border-destructive">
+            <CardContent className="p-6 text-center">
+              <p className="text-destructive font-medium">Failed to load validation queue</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -93,29 +63,29 @@ export default function ValidationQueue() {
           <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2">
               <FileCheck className="h-6 w-6 text-primary" />
-              My Assigned Validations (12 pending)
+              My Assigned Validations ({data?.total || 0} pending)
             </h1>
           </div>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Refresh
           </Button>
         </div>
 
         {/* Filters */}
         <div className="flex gap-2 flex-wrap">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter || "all"} onValueChange={(v) => { setStatusFilter(v === "all" ? undefined : v); setPage(1); }}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="IN_REVIEW">In Progress</SelectItem>
             </SelectContent>
           </Select>
 
-          <Select value={reportTypeFilter} onValueChange={setReportTypeFilter}>
+          <Select value={reportTypeFilter || "all"} onValueChange={(v) => { setReportTypeFilter(v === "all" ? undefined : v); setPage(1); }}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Report Type" />
             </SelectTrigger>
@@ -126,19 +96,7 @@ export default function ValidationQueue() {
             </SelectContent>
           </Select>
 
-          <Select defaultValue="all">
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Date Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Dates</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" onClick={() => { setStatusFilter("PENDING"); setReportTypeFilter(undefined); setPage(1); }}>
             Clear
           </Button>
         </div>
@@ -146,47 +104,91 @@ export default function ValidationQueue() {
         {/* Validation Table */}
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="data-table-header">
-                  <TableHead>Ref #</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Entity</TableHead>
-                  <TableHead>Trans</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Age</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockValidations.map((validation) => (
-                  <TableRow key={validation.id} className="data-table-row">
-                    <TableCell className="font-mono font-medium text-primary">
-                      {validation.referenceNumber}
-                    </TableCell>
-                    <TableCell>
-                      <ReportTypeBadge type={validation.type} />
-                    </TableCell>
-                    <TableCell>{validation.entityName}</TableCell>
-                    <TableCell>{validation.transactionCount}</TableCell>
-                    <TableCell className="text-muted-foreground">{validation.submittedDate}</TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center gap-1 ${validation.overdue ? "text-destructive font-medium" : ""}`}>
-                        {validation.age}{validation.ageUnit}
-                        {validation.overdue && <AlertTriangle className="h-4 w-4 shrink-0" />}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link to={`/compliance/validation/${validation.referenceNumber}/validate`}>
-                        <Button size="sm">Validate</Button>
-                      </Link>
-                    </TableCell>
+            {isLoading ? (
+              <div className="p-12 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                <p className="mt-4 text-muted-foreground">Loading queue...</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="data-table-header">
+                    <TableHead>Ref #</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Entity</TableHead>
+                    <TableHead>Trans</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Age</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {data?.items.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        No validations found in your queue.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    data?.items.map((validation) => (
+                      <TableRow key={validation.submission_id} className="data-table-row">
+                        <TableCell className="font-mono font-medium text-primary">
+                          {validation.reference_number}
+                        </TableCell>
+                        <TableCell>
+                          <ReportTypeBadge type={validation.report_type as any} />
+                        </TableCell>
+                        <TableCell>{validation.entity_name}</TableCell>
+                        <TableCell>{validation.transaction_count}</TableCell>
+                        <TableCell className="text-muted-foreground">{validation.submitted_at}</TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1">
+                            {differenceInDays(new Date(), new Date(validation.submitted_at))}d
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link to={`/compliance/manual-validation/${validation.submission_id}`}>
+                            <Button size="sm">Validate</Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
+
+        {data && data.total_pages > 1 && (
+          <Pagination className="mt-4">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              {Array.from({ length: data.total_pages }, (_, i) => i + 1).map((p) => (
+                <PaginationItem key={p}>
+                  <PaginationLink 
+                    onClick={() => setPage(p)}
+                    isActive={page === p}
+                    className="cursor-pointer"
+                  >
+                    {p}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setPage(p => Math.min(data.total_pages, p + 1))}
+                  className={page === data.total_pages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
 
         {/* Pagination */}
         <div className="flex items-center justify-between">
